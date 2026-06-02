@@ -217,7 +217,7 @@ def collect_stage_data(
         run_id = row.get("run_id") or ""
         if not run_id:
             continue
-        timeline_path = os.path.join(outputs_root, run_id, "coder56", "auto_responder_timeline.jsonl")
+        timeline_path = os.path.join(outputs_root, run_id, "coder56", "coder56_timeline.jsonl")
         start_time = find_init_time(timeline_path)
         if not start_time:
             continue

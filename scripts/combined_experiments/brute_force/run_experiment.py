@@ -150,7 +150,7 @@ def start_coder56(run_id: str) -> subprocess.Popen:
 
 
 def wait_for_coder56_completion(run_id: str, timeout_seconds: int) -> bool:
-    timeline_path = PROJECT_ROOT / "outputs" / run_id / "coder56" / "auto_responder_timeline.jsonl"
+    timeline_path = PROJECT_ROOT / "outputs" / run_id / "coder56" / "coder56_timeline.jsonl"
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
         if timeline_path.exists():

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Cpu, ArrowRight, Radio, MessageSquare, Play } from 'lucide-react';
+import { Radio, MessageSquare, Play } from 'lucide-react';
 import { useOpenCodeStream } from '@/hooks/useOpenCodeStream';
 import { useTimelineStream } from '@/hooks/useTimelineStream';
 import { SessionStream } from '@/components/SessionStream';
@@ -74,8 +74,6 @@ function TimelineEntryRow({ entry }: { entry: TimelineEntry }) {
     </div>
   );
 }
-
-const HOSTS = ['compromised', 'server'] as const;
 
 const TIMELINE_AGENTS: Array<{ key: string; label: string; desc: string; color: string; host: string }> = [
   {
@@ -278,100 +276,6 @@ function TimelineAgentPanel({ agentKey, label, desc, color, host, messagesBySess
   );
 }
 
-function HostPanel({ host, stream, timelineMessages }: { host: string; stream: ReturnType<typeof useOpenCodeStream>; timelineMessages: Record<string, SessionMessage[]> }) {
-  const { sessions, messagesBySession, connected } = stream;
-
-  const sessionEntries = Object.entries(sessions);
-  const activeCount = sessionEntries.filter(([_, s]) => {
-    const st = typeof s === 'string' ? s : (s as any)?.type;
-    return st === 'busy' || st === 'running';
-  }).length;
-
-  return (
-    <div className="card">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Cpu size={18} className="text-trident-accent" />
-          <h3 className="font-heading text-lg font-bold text-trident-text capitalize">{host}</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`badge ${connected ? 'badge-success' : 'badge-danger'}`}>
-            {connected ? 'Live' : 'Disconnected'}
-          </span>
-        </div>
-      </div>
-
-      <div className="mb-3 grid grid-cols-3 gap-3">
-        <div className="rounded-lg bg-black/5 dark:bg-black/30 p-3 text-center">
-          <p className="text-2xl font-bold text-trident-text">{sessionEntries.length}</p>
-          <p className="text-[10px] uppercase tracking-wider text-trident-muted">Sessions</p>
-        </div>
-        <div className="rounded-lg bg-black/5 dark:bg-black/30 p-3 text-center">
-          <p className="text-2xl font-bold text-green-700 dark:text-green-400">{activeCount}</p>
-          <p className="text-[10px] uppercase tracking-wider text-trident-muted">Active</p>
-        </div>
-        <div className="rounded-lg bg-black/5 dark:bg-black/30 p-3 text-center">
-          <p className="text-2xl font-bold text-trident-muted">
-            {Object.values(messagesBySession).reduce((a, b) => a + b.length, 0)}
-          </p>
-          <p className="text-[10px] uppercase tracking-wider text-trident-muted">Messages</p>
-        </div>
-      </div>
-
-      {sessionEntries.length === 0 ? (
-        <p className="py-4 text-center text-sm text-trident-muted">No active sessions</p>
-      ) : (
-        <div className="space-y-2">
-          {sessionEntries.map(([sid, rawStatus]) => {
-            // Status may arrive as a string or as {type: "busy"}
-            const statusStr = typeof rawStatus === 'string'
-              ? rawStatus
-              : (rawStatus as any)?.type ?? 'unknown';
-            const msgs = messagesBySession[sid] || [];
-            const lastMsg = msgs[msgs.length - 1];
-            const rawLastText = lastMsg?.parts?.find((p) => p.type === 'text')?.text;
-            const lastText = typeof rawLastText === 'string' ? rawLastText : '';
-
-            return (
-              <Link
-                key={sid}
-                to={`/agents/${host}/${sid}`}
-                className="block rounded-lg border border-trident-border p-3 transition-colors hover:border-trident-accent/50 hover:bg-trident-accent/5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-trident-text">
-                    {sid.slice(0, 12)}…
-                  </span>
-                  <span
-                    className={`badge ${
-                      statusStr === 'busy' || statusStr === 'running'
-                        ? 'badge-warning'
-                        : statusStr === 'idle'
-                        ? 'badge-success'
-                        : 'badge-muted'
-                    }`}
-                  >
-                    {statusStr}
-                  </span>
-                </div>
-                {lastText && (
-                  <p className="mt-1 truncate text-xs text-trident-muted">
-                    {lastText.slice(0, 120)}
-                  </p>
-                )}
-                <div className="mt-1 flex items-center justify-between text-[10px] text-trident-muted">
-                  <span>{msgs.length} messages</span>
-                  <ArrowRight size={10} />
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function AgentsPage() {
   const { replay } = useReplayContext();
 
@@ -446,19 +350,6 @@ export function AgentsPage() {
               timelineStream={timelineStreamsByAgent[a.key]}
               isReplayActive={isReplayActive}
             />
-          ))}
-        </div>
-      </div>
-
-      {/* ── OpenCode sessions (compromised / server) ── */}
-      <div>
-        <h2 className="font-heading text-xl font-bold text-trident-text">OpenCode Sessions</h2>
-        <p className="mb-4 text-sm text-trident-muted">
-          Live OpenCode sessions across compromised host and server
-        </p>
-        <div className="grid grid-cols-2 gap-6">
-          {HOSTS.map((host) => (
-            <HostPanel key={host} host={host} stream={streamByHost[host]} timelineMessages={timelineMessages} />
           ))}
         </div>
       </div>

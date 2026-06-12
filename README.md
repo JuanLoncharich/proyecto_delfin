@@ -103,7 +103,60 @@ The lab supports an attacker agent (coder56), a defender agent (SLIPS + auto-res
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure your API key, provider, and credentials. See [`guide/credentials.md`](guide/credentials.md) for all variables, supported providers, and per-agent model overrides.
+Trident requires a valid LLM API key and provider settings before you can run agents. You can configure the environment either **manually** by editing the `.env` file, or **via the web UI** using the built-in config app.
+
+### Option 1: Manual configuration (edit `.env`)
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit with your preferred editor
+nano .env
+```
+
+Set at least these three variables:
+
+```bash
+LLM_API_KEY=your-api-key-here
+LLM_BASE_URL=https://api.openai.com/v1
+PROVIDER_NAME=openai
+```
+
+For the full list of variables (per-agent models, planner overrides, SSH credentials, etc.), see [`guide/credentials.md`](guide/credentials.md).
+
+### Option 2: Web UI (config app)
+
+Trident includes a dedicated configuration web app for interactive setup:
+
+```bash
+# Start the config app
+make config
+# → http://localhost:8889
+```
+
+The UI provides:
+
+- **Quick presets** — one-click provider selection (OpenAI, Anthropic, Gemini, e-INFRA, OpenRouter)
+- **Grouped settings** — LLM provider, per-agent models, planner overrides, defender settings, and lab credentials
+- **Password masking** — API keys are masked in the UI (only last 4 characters shown)
+- **Validation** — missing required fields are highlighted before you save
+- **Connection test** — click "Test Connection" to verify your API key and base URL work before rebuilding
+
+**How to use the UI:**
+
+1. Run `make config` and open http://localhost:8889
+2. Select a provider preset or fill in the LLM Provider section manually
+3. (Optional) Set per-agent model overrides in the Agent Models section
+4. Set `SSH_COMPROMISED_PASS` (required — the compromised container will not start without it)
+5. Click **Save Changes**
+6. Click **Test Connection** to verify the API key works
+7. Rebuild and restart the lab to apply changes:
+   ```bash
+   make build && make up
+   ```
+
+> **Note:** The config app writes directly to `.env`. Changes only take effect after you rebuild the containers with `make build && make up`.
 
 ---
 

@@ -162,9 +162,9 @@ def format_commands_for_llm(commands):
 
 def call_llm_for_expansion(run_num, initial_observation, commands_text):
     """Call LLM to expand on the initial observation"""
-    api_key = os.environ.get('OPENCODE_API_KEY')
+    api_key = os.environ.get('LLM_API_KEY') or os.environ.get('OPENCODE_API_KEY')
     if not api_key:
-        print("  Error: OPENCODE_API_KEY not set")
+        print("  Error: LLM_API_KEY not set")
         return None
     
     prompt = f"""You are analyzing an automated incident response to a data exfiltration attack. The attacker used PostgreSQL dump (pg_dump) piped to netcat to exfiltrate a database to IP 137.184.126.86 on port 443.

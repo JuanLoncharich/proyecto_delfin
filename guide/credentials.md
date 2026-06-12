@@ -1,56 +1,110 @@
-# Credentials (Lab‑Only Defaults)
+# Credentials and LLM Provider Configuration
 
-These defaults are **for the isolated lab only**. Do not reuse them on real systems. Override via environment variables or `.env`.
+## Quick start
 
-## Compromised host (SSH)
-- User: `labuser`
-- Password: `LAB_PASSWORD` (default `adminadmin` in `.env.example`)
+```bash
+cp .env.example .env
+# Edit .env — set these four values:
+#   LLM_API_KEY     = your API key
+#   LLM_BASE_URL    = provider's base URL (e.g. https://api.openai.com/v1)
+#   PROVIDER_NAME   = provider identifier (e.g. "openai", "anthropic", "gemini")
+#   LLM_MODEL       = default model name (e.g. "gpt-4o", "claude-sonnet-4-20250514")
+```
 
-## Server (SSH)
-- User: `root`
-- Password: `admin123` (set in `images/server/Dockerfile`)
-
-## Web login app
-- User: `LOGIN_USER` (default `admin`)
-- Password: `LOGIN_PASSWORD` (default `admin`)
-
-## PostgreSQL
-- User: `DB_USER` (default `labuser`)
-- Password: `DB_PASSWORD` (default `labpass`)
-
-## Where to set overrides
-- Copy `.env.example` to `.env` and change values.
-- Or export environment variables before `make up`.
-
-## Notes
-- The repository ships a `.env` for local dev convenience; treat it as lab-only and replace values in real use.
-- If `LAB_PASSWORD` is missing, `lab_compromised` will fail to start (entrypoint requires it).
-
-## Environment variables
-
-All variables are read from `.env` (copy `.env.example` to `.env` before first use).
+## LLM provider variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `LAB_PASSWORD` | Yes | `adminadmin` | SSH password for `labuser` on `lab_compromised` |
-| `RUN_ID` | No | auto-generated | Scopes output artifacts under `outputs/<RUN_ID>/` |
-| `COMPOSE_PROJECT_NAME` | No | `lab` | Docker Compose project name prefix |
-| `OPENCODE_API_KEY` | Yes (agents) | — | API key used by OpenCode-based agents |
-| `OPENAI_API_KEY` | Yes (agents) | — | OpenAI API key for LLM-driven components |
-| `OPENAI_BASE_URL` | No | OpenAI default | Custom base URL for OpenAI-compatible endpoints |
-| `LLM_MODEL` | No | `gpt-4o-mini` | Model name passed to LLM calls |
-| `DEFENDER_PORT` | No | `8000` | Host port for the SLIPS defender service |
-| `PLANNER_PORT` | No | `1654` | Host port for the planner service |
-| `PLANNER_URL` | No | `http://127.0.0.1:1654/plan` | Full URL the defender uses to reach the planner |
-| `OPENCODE_TIMEOUT` | No | `450` | Timeout in seconds for OpenCode agent sessions |
-| `LOGIN_USER` | No | `admin` | Username for the web login app on `lab_server` |
-| `LOGIN_PASSWORD` | No | `admin` | Password for the web login app on `lab_server` |
-| `DB_USER` | No | `labuser` | PostgreSQL user created on `lab_server` |
+| `LLM_API_KEY` | Yes | — | API key for all LLM calls (OpenCode agents + planner) |
+| `LLM_BASE_URL` | Yes | — | Base URL for the LLM provider's chat completions API (e.g. `https://api.openai.com/v1`) |
+| `PROVIDER_NAME` | Yes | `openai` | Provider identifier for OpenCode auth.json |
+| `LLM_MODEL` | No | `gpt-4o` | Default model for all OpenCode agents |
+
+### Common provider values
+
+| Provider | `PROVIDER_NAME` | `LLM_BASE_URL` |
+|---|---|---|
+| OpenAI | `openai` | `https://api.openai.com/v1` |
+| Anthropic | `anthropic` | `https://api.anthropic.com/v1` |
+| Google Gemini | `gemini` | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| e-INFRA CZ | `openai` | `https://llm.ai.e-infra.cz/v1` |
+| OpenRouter | `openai` | `https://openrouter.ai/api/v1` |
+
+For providers with a `/v1/chat/completions` endpoint (e-INFRA, OpenRouter, local proxies), use `PROVIDER_NAME=openai`.
+
+### Per-agent model overrides
+
+Each agent can use a different model. Leave empty to use `LLM_MODEL`:
+
+| Variable | Agent | Default |
+|---|---|---|
+| `CODER56_MODEL` | Attacker (coder56) | `LLM_MODEL` |
+| `DB_ADMIN_MODEL` | Benign traffic (db_admin) | `LLM_MODEL` |
+| `SOC_GOD_MODEL` | Defender execution (soc_god) | `LLM_MODEL` |
+
+### Planner-specific overrides
+
+The defender's incident planner can use a different key/endpoint:
+
+| Variable | Default | Description |
+|---|---|---|
+| `PLANNER_MODEL` | `gpt-4o` | Model for the incident response planner |
+| `PLANNER_API_KEY` | `LLM_API_KEY` | API key override for the planner |
+| `PLANNER_BASE_URL` | `LLM_BASE_URL` | Base URL override for the planner |
+
+## SSH and lab credentials
+
+These defaults are **for the isolated lab only**. Do not reuse them on real systems.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SSH_COMPROMISED_PASS` | Yes | `admin` | SSH password for `labuser` on `lab_compromised` |
+| `SSH_COMPROMISED_USER` | No | `labuser` | SSH username (changing requires image rebuild) |
+| `LOGIN_USER` | No | `admin` | Web login app username on `lab_server` |
+| `LOGIN_PASSWORD` | No | `admin` | Web login app password on `lab_server` |
+| `DB_USER` | No | `labuser` | PostgreSQL user on `lab_server` |
 | `DB_PASSWORD` | No | `labpass` | PostgreSQL password on `lab_server` |
 
 ## Hardcoded credentials
 
 The `lab_server` root SSH password (`admin123`) is set directly in
-`images/server/Dockerfile` (line `echo 'root:admin123' | chpasswd`) and
-**cannot** be overridden via `.env`. To change it, edit the Dockerfile and
-rebuild the image with `make build`.
+`images/server/Dockerfile` and **cannot** be overridden via `.env`.
+To change it, edit the Dockerfile and rebuild with `make build`.
+
+## Backward compatibility
+
+The old variable names `OPENCODE_API_KEY`, `OPENAI_API_KEY`, and `LLM_URL` still
+work as fallbacks. `LLM_API_KEY` and `LLM_BASE_URL` take precedence if set.
+
+## Testing LLM connectivity
+
+### Via the config web app
+
+```bash
+make config
+# Open http://localhost:8889 → LLM Provider section → "Test Connection"
+```
+
+### Via terminal (curl)
+
+Load your `.env` and send a minimal request:
+
+```bash
+source .env && curl -s "${LLM_BASE_URL}/chat/completions" \
+  -H "Authorization: Bearer ${LLM_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"'"${LLM_MODEL}"'","messages":[{"role":"user","content":"Reply with only the word: pong"}],"max_tokens":10}' \
+  | python3 -m json.tool
+```
+
+Or with hardcoded values:
+
+```bash
+curl -s "https://your-provider-url/v1/chat/completions" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"your-model","messages":[{"role":"user","content":"Reply with only the word: pong"}],"max_tokens":10}' \
+  | python3 -m json.tool
+```
+
+A successful response returns a JSON object with `choices[0].message.content`. If you get a 401, check `LLM_API_KEY`. If you get a connection error, check `LLM_BASE_URL`.

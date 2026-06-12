@@ -56,7 +56,7 @@ For routing details, PCAP capture mechanics, and network topology, see [`guide/a
 git clone https://github.com/labsin-uncuyo/Trident.git
 cd Trident
 
-# Configure environment — set at least LAB_PASSWORD and OPENCODE_API_KEY
+# Configure environment — set at least LLM_API_KEY, LLM_BASE_URL, and SSH_COMPROMISED_PASS
 cp .env.example .env
 # edit .env ...
 
@@ -103,7 +103,7 @@ The lab supports an attacker agent (coder56), a defender agent (SLIPS + auto-res
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure your API keys and credentials. See [`guide/credentials.md`](guide/credentials.md) for all variables and default credentials.
+Copy `.env.example` to `.env` and configure your API key, provider, and credentials. See [`guide/credentials.md`](guide/credentials.md) for all variables, supported providers, and per-agent model overrides.
 
 ---
 

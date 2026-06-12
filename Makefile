@@ -4,7 +4,7 @@ PYTHON ?= python3
 export COMPOSE_PROJECT_NAME := lab
 RUN_ID_FILE := ./outputs/.current_run
 
-.PHONY: build up down clean ssh_keys aracne defend not_defend coder56 benign dashboard
+.PHONY: build up down clean ssh_keys aracne defend not_defend coder56 benign dashboard config
 
 build:
 	@echo "Building all compose services..."
@@ -65,6 +65,35 @@ dashboard:
 		RUN_ID=$$RUN_ID $(COMPOSE) --profile core up -d dashboard; \
 	fi; \
 	echo "✓ Dashboard running at http://localhost:8888"
+
+CONFIG_BUILD_MARKER := .config_build_marker
+
+config:
+	@echo "Starting config app..."
+	@needs_build=0; \
+	if [ -f $(CONFIG_BUILD_MARKER) ]; then \
+		current_content=$$(find images/config_app/frontend/src images/config_app/frontend/package.json images/config_app/frontend/vite.config.ts images/config_app/frontend/tsconfig.json images/config_app/backend -type f -exec stat -c "%Y %n" {} \; 2>/dev/null | sort | md5sum | cut -d' ' -f1); \
+		stored_content=$$(cat $(CONFIG_BUILD_MARKER) 2>/dev/null); \
+		if [ "$$current_content" != "$$stored_content" ]; then \
+			echo "Config app files changed, rebuilding..."; \
+			needs_build=1; \
+		fi; \
+	else \
+		echo "No build marker found, building..."; \
+		needs_build=1; \
+	fi; \
+	if [ $$needs_build -eq 1 ]; then \
+		echo "Building config image..."; \
+		$(COMPOSE) --profile core build config; \
+		find images/config_app/frontend/src images/config_app/frontend/package.json images/config_app/frontend/vite.config.ts images/config_app/frontend/tsconfig.json images/config_app/backend -type f -exec stat -c "%Y %n" {} \; 2>/dev/null | sort | md5sum | cut -d' ' -f1 > $(CONFIG_BUILD_MARKER); \
+		echo "✓ Build complete"; \
+	else \
+		echo "✓ Using cached config image (no changes)"; \
+	fi; \
+	echo "Starting config app..."; \
+	$(COMPOSE) --profile core rm -sf config 2>/dev/null || true; \
+	$(COMPOSE) --profile core up -d config; \
+	echo "✓ Config app running at http://localhost:8889"
 
 ssh_keys:
 	@echo "Setting up SSH keys for auto_responder..."

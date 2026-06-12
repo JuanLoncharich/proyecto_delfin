@@ -61,10 +61,11 @@ You can re-run key provisioning independently with `make ssh_keys`.
 |---|---|---|
 | `DEFENDER_PORT` | 8000 | Host port the defender health endpoint binds to; must be free |
 | `PLANNER_PORT` | 1654 | Internal planner gRPC port |
-| `OPENAI_API_KEY` | -- | Required for the LLM planner |
-| `OPENCODE_API_KEY` | -- | Required for auto-responder remediation |
-| `LLM_MODEL` | gpt-4o-mini | Model used by the incident planner |
-| `LAB_PASSWORD` | -- | SSH password for lab hosts |
+| `LLM_API_KEY` | — | Required; API key for the LLM provider |
+| `LLM_BASE_URL` | — | Required; LLM provider base URL |
+| `PLANNER_MODEL` | `gpt-4o` | Model for the incident response planner |
+| `SOC_GOD_MODEL` | `LLM_MODEL` | Model for the auto-responder execution agent |
+| `SSH_COMPROMISED_PASS` | — | SSH password for lab hosts |
 
 ### Gotchas
 
@@ -108,8 +109,9 @@ To stop it, kill the PID or the underlying `docker exec` process.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `OPENCODE_API_KEY` | -- | Required; passed into `lab_compromised` |
-| `OPENAI_API_KEY` | -- | Required; used by the LLM backend |
+| `LLM_API_KEY` | — | Required; API key for the LLM provider |
+| `LLM_BASE_URL` | — | Required; LLM provider base URL |
+| `LLM_MODEL` | `gpt-4o` | Default model; override with `CODER56_MODEL` |
 | `OPENCODE_TIMEOUT` | 600 | Seconds before the run is forcibly terminated |
 | `OPENCODE_MODE` | run | `run` (headless JSON) or `tui` (interactive, requires pexpect) |
 
@@ -157,7 +159,9 @@ session logs and API message exports written by the db_admin client.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `OPENCODE_API_KEY` | -- | Required; used by the OpenCode server on `lab_compromised` |
+| `LLM_API_KEY` | — | Required; API key for the LLM provider |
+| `LLM_BASE_URL` | — | Required; LLM provider base URL |
+| `LLM_MODEL` | `gpt-4o` | Default model; override with `DB_ADMIN_MODEL` |
 | `GOAL` | (built-in default) | Optional custom goal text |
 | `TIME_LIMIT` | (none) | Optional; seconds before the agent stops gracefully |
 

@@ -55,3 +55,6 @@ test_opencode_*.exp
 
 # External repositories
 external/
+
+# Build markers
+.*_build_marker

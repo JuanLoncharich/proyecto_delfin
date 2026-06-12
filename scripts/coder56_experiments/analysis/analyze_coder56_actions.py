@@ -175,10 +175,10 @@ def format_commands_for_llm(commands: List[Dict[str, str]]) -> str:
 
 
 def call_llm(run_id: str, commands_text: str, goal: str, model: str) -> str:
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENCODE_API_KEY")
+    api_key = os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENCODE_API_KEY")
     base_url = os.environ.get("OPENAI_BASE_URL") or DEFAULT_BASE_URL
     if not api_key or not base_url:
-        return "OPENAI_API_KEY or OPENAI_BASE_URL not set; skipped LLM expansion."
+        return "LLM_API_KEY or OPENAI_BASE_URL not set; skipped LLM expansion."
     base_url = base_url.rstrip("/")
     url = f"{base_url}/chat/completions"
     prompt = f"""You are analyzing an attacker agent run in a cyber range.

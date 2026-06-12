@@ -477,10 +477,10 @@ class OpenCodeAnalyzer:
         output.append("")
 
         # Get API key from environment (already loaded by load_env())
-        api_key = os.environ.get('OPENCODE_API_KEY')
+        api_key = os.environ.get('LLM_API_KEY') or os.environ.get('OPENCODE_API_KEY')
         if not api_key:
-            print("Warning: OPENCODE_API_KEY not set, skipping LLM analysis")
-            output.append("> LLM analysis skipped: OPENCODE_API_KEY not configured")
+            print("Warning: LLM_API_KEY not set, skipping LLM analysis")
+            output.append("> LLM analysis skipped: LLM_API_KEY not configured")
             output.append("")
             return "\n".join(output)
 

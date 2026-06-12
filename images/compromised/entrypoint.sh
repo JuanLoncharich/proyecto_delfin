@@ -5,24 +5,50 @@ set -euo pipefail
 : "${SSH_COMPROMISED_USER:=labuser}"
 : "${RUN_ID:=run_local}"
 
+# ── LLM provider configuration ────────────────────────────────────
+# Backward compat: accept OPENCODE_API_KEY if LLM_API_KEY is unset
+: "${LLM_API_KEY:=${OPENCODE_API_KEY:-}}"
+
+# Validate required vars
+if [ -z "${LLM_API_KEY:-}" ]; then
+    echo "ERROR: LLM_API_KEY is not set. Export it in your .env file." >&2
+    exit 1
+fi
+if [ -z "${LLM_BASE_URL:-}" ]; then
+    echo "ERROR: LLM_BASE_URL is not set. Export it in your .env file." >&2
+    exit 1
+fi
+
+# Defaults
+: "${PROVIDER_NAME:=openai}"
+: "${LLM_MODEL:=gpt-4o}"
+: "${CODER56_MODEL:=${LLM_MODEL}}"
+: "${DB_ADMIN_MODEL:=${LLM_MODEL}}"
+: "${SOC_GOD_MODEL:=${LLM_MODEL}}"
+
 printf '%s:%s\n' "${SSH_COMPROMISED_USER}" "${SSH_COMPROMISED_PASS}" | chpasswd
 
 mkdir -p /etc/sudoers.d
 echo "labuser ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/labuser
 chmod 440 /etc/sudoers.d/labuser
-echo 'Defaults env_keep += "OPENCODE_API_KEY"' >/etc/sudoers.d/opencode_env
+echo 'Defaults env_keep += "LLM_API_KEY OPENCODE_API_KEY"' >/etc/sudoers.d/opencode_env
 chmod 440 /etc/sudoers.d/opencode_env
 
-# Create OpenCode auth.json with API key from environment
-mkdir -p /root/.local/share/opencode
-cat >/root/.local/share/opencode/auth.json <<EOF
+# ── Generate OpenCode auth.json from env ───────────────────────────
+# The provider key in auth.json MUST match the provider key in opencode.json.
+_auth_json() {
+    cat <<EOF
 {
-    "e-infra-chat": {
+    "${PROVIDER_NAME}": {
         "type": "api",
-        "key": "${OPENCODE_API_KEY:-}"
+        "key": "${LLM_API_KEY}"
     }
 }
 EOF
+}
+
+mkdir -p /root/.local/share/opencode
+_auth_json >/root/.local/share/opencode/auth.json
 
 # Ensure OpenCode is on PATH for all users/shells (copy binary out of /root)
 if [ -x /root/.opencode/bin/opencode ]; then
@@ -35,10 +61,11 @@ export PATH="/usr/local/bin:/usr/bin:${PATH}"
 EOF
 chmod 644 /etc/profile.d/opencode.sh
 
-# Ensure OPENCODE_API_KEY is available in SSH login shells
-if [ -n "${OPENCODE_API_KEY:-}" ]; then
+# Ensure LLM_API_KEY is available in SSH login shells
+if [ -n "${LLM_API_KEY}" ]; then
     cat >/etc/profile.d/opencode_env.sh <<EOF
-export OPENCODE_API_KEY='${OPENCODE_API_KEY}'
+export LLM_API_KEY='${LLM_API_KEY}'
+export OPENCODE_API_KEY='${LLM_API_KEY}'
 EOF
     chmod 644 /etc/profile.d/opencode_env.sh
 fi
@@ -47,20 +74,21 @@ fi
 install -d -m 700 -o labuser -g labuser /home/labuser/.config/opencode /home/labuser/.local /home/labuser/.local/share /home/labuser/.local/share/opencode
 install -d -m 700 -o labuser -g labuser /home/labuser/.local/state
 chown -R labuser:labuser /home/labuser/.local
-cat >/home/labuser/.local/share/opencode/auth.json <<EOF
-{
-    "e-infra-chat": {
-        "type": "api",
-        "key": "${OPENCODE_API_KEY:-}"
-    }
-}
-EOF
+_auth_json >/home/labuser/.local/share/opencode/auth.json
 chown labuser:labuser /home/labuser/.local/share/opencode/auth.json
 
-# Copy OpenCode configuration (already has {env:OPENCODE_API_KEY} placeholder)
+# ── Generate opencode.json from template ───────────────────────────
+# The template uses ${VAR} placeholders. envsubst replaces them with
+# the current environment values at container start.
 if [ -f /root/.config/opencode/opencode.json.template ]; then
-    cp /root/.config/opencode/opencode.json.template /root/.config/opencode/opencode.json
-    install -m 600 -o labuser -g labuser /root/.config/opencode/opencode.json.template /home/labuser/.config/opencode/opencode.json
+    export PROVIDER_NAME LLM_BASE_URL LLM_API_KEY LLM_MODEL CODER56_MODEL DB_ADMIN_MODEL SOC_GOD_MODEL
+
+    # Only substitute our specific variables to avoid touching literal $ in JSON
+    envsubst '${PROVIDER_NAME} ${LLM_BASE_URL} ${LLM_API_KEY} ${LLM_MODEL} ${CODER56_MODEL} ${DB_ADMIN_MODEL} ${SOC_GOD_MODEL}' \
+        </root/.config/opencode/opencode.json.template \
+        >/root/.config/opencode/opencode.json
+
+    install -m 600 -o labuser -g labuser /root/.config/opencode/opencode.json /home/labuser/.config/opencode/opencode.json
 fi
 
 install -m 700 -o labuser -g labuser -d /home/labuser/.ssh
@@ -123,6 +151,12 @@ ip route replace default via 172.30.0.1 dev eth0 || true
 opencode_log="/var/log/opencode-serve.log"
 touch "${opencode_log}"
 echo "Starting OpenCode HTTP server on 0.0.0.0:4096..."
+echo "  Provider: ${PROVIDER_NAME}"
+echo "  Base URL: ${LLM_BASE_URL}"
+echo "  Default model: ${LLM_MODEL}"
+echo "  coder56 model: ${CODER56_MODEL}"
+echo "  db_admin model: ${DB_ADMIN_MODEL}"
+echo "  soc_god model: ${SOC_GOD_MODEL}"
 cd /tmp && opencode serve --hostname 0.0.0.0 --port 4096 >>"${opencode_log}" 2>&1 &
 OPENCODE_PID=$!
 echo "✅ OpenCode serve started (PID ${OPENCODE_PID})"

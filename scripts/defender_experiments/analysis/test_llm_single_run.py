@@ -155,9 +155,9 @@ Answer in 2-3 sentences:
     print()
 
     # Get API key
-    api_key = os.environ.get('OPENCODE_API_KEY')
+    api_key = os.environ.get('LLM_API_KEY') or os.environ.get('OPENCODE_API_KEY')
     if not api_key:
-        print("Error: OPENCODE_API_KEY not set")
+        print("Error: LLM_API_KEY not set")
         return
 
     print("Sending prompt to LLM...")

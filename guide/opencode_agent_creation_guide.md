@@ -15,7 +15,7 @@ This guide explains how to create custom OpenCode agents and integrate them into
 
 ## OpenCode Agent Basics
 
-OpenCode agents are autonomous AI-powered entities defined in `opencode.json` that execute tasks with specific permissions, models, and behavioral prompts. Each agent has:
+OpenCode agents are autonomous AI-powered entities defined in `opencode.json.template` that execute tasks with specific permissions, models, and behavioral prompts. Each agent has:
 
 - **Model**: Which LLM to use (e.g., `e-infra-chat/qwen3-coder`)
 - **Permissions**: What tools it can access (bash, edit, write)
@@ -590,7 +590,7 @@ curl http://172.30.0.10:4096/session/status | jq 'length'
 
 ### Step 1: Define Agent Configuration
 
-Add your agent to `images/compromised/opencode.json` under the `agent` section:
+Add your agent to `images/compromised/opencode.json.template` under the `agent` section:
 
 ```json
 {
@@ -629,14 +629,12 @@ LLM_MODEL=qwen3-coder
 
 ### Step 3: Restart OpenCode Server
 
-After modifying `opencode.json`:
+After modifying `opencode.json.template`:
 
 ```bash
-# Stop containers
-docker compose stop compromised server
-
-# Start containers (reloads opencode.json)
-docker compose start compromised server
+# Rebuild and restart containers (template is rendered at start)
+make build
+make up
 ```
 
 ---
@@ -899,7 +897,7 @@ Let's create a `net_recon` agent that performs network discovery.
 
 #### Step 1: Add Agent Configuration
 
-Edit `images/compromised/opencode.json`:
+Edit `images/compromised/opencode.json.template`:
 
 ```json
 {
@@ -1022,7 +1020,7 @@ python3 ./images/compromised/net_recon_client.py "172.31.0.0/24"
 **Error:** `Agent 'your_agent' not found`
 
 **Solution:**
-- Verify agent name in `opencode.json` matches the call
+- Verify agent name in `opencode.json.template` matches the call
 - Restart container after modifying config:
   ```bash
   docker compose restart compromised
@@ -1033,7 +1031,7 @@ python3 ./images/compromised/net_recon_client.py "172.31.0.0/24"
 **Error:** `Permission denied: bash command not allowed`
 
 **Solution:**
-- Check agent permissions in `opencode.json`
+- Check agent permissions in `opencode.json.template`
 - Add specific command pattern to permission list
 - Ensure `bash: true` is set for the agent
 
@@ -1180,7 +1178,7 @@ cat .env | grep OPENCODE
 
 - **OpenCode Documentation**: https://opencode.ai/docs
 - **Trident README**: `/home/diego/Trident/README.md`
-- **Example Agents**: `images/compromised/opencode.json`
+- **Example Agents**: `images/compromised/opencode.json.template`
 - **Client Scripts**: `images/compromised/*_opencode_client.py`
 - **Docker Configuration**: `docker-compose.yml`
 - **Entry Point Script**: `images/compromised/entrypoint.sh`
@@ -1222,7 +1220,7 @@ docker compose restart compromised
 | File | Purpose |
 |------|---------|
 | `.env` | Environment variables (API keys, ports) |
-| `images/compromised/opencode.json` | Agent configurations |
+| `images/compromised/opencode.json.template` | Agent configurations (rendered at container start) |
 | `docker-compose.yml` | Service definitions |
 | `images/compromised/entrypoint.sh` | Container startup script |
 

@@ -62,8 +62,8 @@ ENV PATH="/root/.opencode/bin:${PATH}"
 RUN mkdir -p /root/.config/opencode \
     && mkdir -p /root/.local/share/opencode
 
-# Copy OpenCode configuration template
-COPY opencode.json /root/.config/opencode/opencode.json.template
+# Copy OpenCode configuration template (envsubst fills in provider/model at start)
+COPY opencode.json.template /root/.config/opencode/opencode.json.template
 
 # Create symlink for opencode in system PATH
 RUN ln -sf /root/.opencode/bin/opencode /usr/local/bin/opencode

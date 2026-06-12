@@ -72,10 +72,10 @@ def extract_wordlists(cmd):
 
 
 def call_llm(prompt, model):
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENCODE_API_KEY")
+    api_key = os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENCODE_API_KEY")
     base_url = os.environ.get("OPENAI_BASE_URL") or DEFAULT_BASE_URL
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not set.")
+        raise RuntimeError("LLM_API_KEY not set.")
     url = base_url.rstrip("/") + "/chat/completions"
     resp = requests.post(
         url,

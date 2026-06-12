@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-trident-bg: #f1f5f9;
+    --color-trident-surface: #ffffff;
+    --color-trident-border: #cbd5e1;
+    --color-trident-accent: #1d4ed8;
+    --color-trident-text: #020617;
+    --color-trident-muted: #1e293b;
+  }
+
+  .dark {
+    --color-trident-bg: #0f172a;
+    --color-trident-surface: #1e293b;
+    --color-trident-border: #334155;
+    --color-trident-accent: #3b82f6;
+    --color-trident-text: #ffffff;
+    --color-trident-muted: #cbd5e1;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #64748b transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-trident-border bg-trident-surface p-6 shadow-lg;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-trident-accent focus:ring-offset-2 focus:ring-offset-trident-bg;
+  }
+
+  .btn-primary {
+    @apply btn bg-trident-accent text-white hover:bg-trident-accent-hover;
+  }
+
+  .btn-ghost {
+    @apply btn text-trident-muted hover:bg-trident-border hover:text-trident-text;
+  }
+
+  .input-field {
+    @apply w-full rounded-lg border border-trident-border bg-trident-bg px-3 py-2 text-sm text-trident-text placeholder-trident-muted/50 focus:border-trident-accent focus:outline-none focus:ring-1 focus:ring-trident-accent;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-trident-muted mb-1;
+  }
+}

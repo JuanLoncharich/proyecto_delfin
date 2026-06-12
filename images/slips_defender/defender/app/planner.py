@@ -28,12 +28,12 @@ def _is_truthy(value: Optional[str], default: bool = False) -> bool:
 
 @dataclass
 class PlannerConfig:
-    model: str = os.getenv("PLANNER_MODEL", "gpt-oss-120b")
+    model: str = os.getenv("PLANNER_MODEL", "gpt-4o")
     temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.2"))
     max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "1200"))
-    # OpenAI-compatible endpoint values
-    openai_base_url: Optional[str] = os.getenv("LLM_URL")
-    openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+    # OpenAI-compatible endpoint values (accept both old and new var names)
+    openai_base_url: Optional[str] = os.getenv("LLM_BASE_URL", os.getenv("LLM_URL"))
+    openai_api_key: Optional[str] = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY"))
     # Optional Langfuse tracing
     langfuse_enabled: bool = _is_truthy(os.getenv("LANGFUSE_ENABLED"), default=False)
     langfuse_public_key: Optional[str] = os.getenv("LANGFUSE_PUBLIC_KEY")

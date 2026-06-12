@@ -41,16 +41,20 @@ services:
       - PLANNER_REQUEST_TIMEOUT=${PLANNER_REQUEST_TIMEOUT:-45}
       - PLANNER_REQUEST_RETRIES=${PLANNER_REQUEST_RETRIES:-2}
       - OPENCODE_TIMEOUT=${OPENCODE_TIMEOUT:-1200}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - LLM_URL=${LLM_URL}
-      - LLM_MODEL=${LLM_MODEL}
+      - OPENAI_API_KEY=${LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      - LLM_URL=${LLM_BASE_URL:-${LLM_URL:-}}
+      - LLM_BASE_URL=${LLM_BASE_URL:-${LLM_URL:-}}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+      - PLANNER_MODEL=${PLANNER_MODEL:-gpt-4o}
+      - PLANNER_API_KEY=${PLANNER_API_KEY:-${LLM_API_KEY:-${OPENAI_API_KEY:-}}}
+      - PLANNER_BASE_URL=${PLANNER_BASE_URL:-${LLM_BASE_URL:-${LLM_URL:-}}}
       - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
       - LANGFUSE_HOST=${LANGFUSE_HOST:-}
       - LANGFUSE_TRACE_NAME=${LANGFUSE_TRACE_NAME:-incident_planner}
       - SSH_COMPROMISED_PASS=${SSH_COMPROMISED_PASS}
-      - OPENCODE_API_KEY=${OPENCODE_API_KEY}
+      - OPENCODE_API_KEY=${LLM_API_KEY:-${OPENCODE_API_KEY:-}}
       - PLANNER_ONLY=${PLANNER_ONLY:-}
     volumes:
       - ./outputs/${RUN_ID}/pcaps:/StratosphereLinuxIPS/dataset
@@ -96,10 +100,14 @@ services:
       - SSH_COMPROMISED_PASS=${SSH_COMPROMISED_PASS}
       - SSH_COMPROMISED_USER=${SSH_COMPROMISED_USER:-labuser}
       - RUN_ID=${RUN_ID}
-      - OPENCODE_API_KEY=${OPENCODE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - LLM_URL=${LLM_URL}
-      - LLM_MODEL=${LLM_MODEL}
+      - LLM_API_KEY=${LLM_API_KEY:-${OPENCODE_API_KEY:-}}
+      - LLM_BASE_URL=${LLM_BASE_URL:-${LLM_URL:-}}
+      - PROVIDER_NAME=${PROVIDER_NAME:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+      - CODER56_MODEL=${CODER56_MODEL:-}
+      - DB_ADMIN_MODEL=${DB_ADMIN_MODEL:-}
+      - SOC_GOD_MODEL=${SOC_GOD_MODEL:-}
+      - OPENCODE_API_KEY=${OPENCODE_API_KEY:-${LLM_API_KEY:-}}
     volumes:
       - ./outputs:/outputs
       - ./images/compromised/secrets/authorized_keys:/secrets/authorized_keys:ro
@@ -139,8 +147,8 @@ services:
     privileged: true
     environment:
       - RUN_ID=${RUN_ID}
-      - OPENCODE_API_KEY=${OPENCODE_API_KEY}
-      - LLM_URL=${LLM_URL}
+      - OPENCODE_API_KEY=${LLM_API_KEY:-${OPENCODE_API_KEY:-}}
+      - LLM_URL=${LLM_BASE_URL:-${LLM_URL:-}}
       - LOGIN_USER=${LOGIN_USER:-admin}
       - LOGIN_PASSWORD=${LOGIN_PASSWORD:-admin}
     volumes:
@@ -192,6 +200,23 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  config:
+    build: ./images/config_app
+    image: lab/config:latest
+    container_name: lab_config
+    profiles:
+      - core
+    ports:
+      - "8889:8081"
+    volumes:
+      - ./.env:/app/.env
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8081/api/health"]
       interval: 10s
       timeout: 3s
       retries: 5

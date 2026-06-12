@@ -357,9 +357,9 @@ class FailureAnalyzer:
 
         print("\nAnalyzing root causes with LLM...")
 
-        api_key = os.environ.get('OPENCODE_API_KEY')
+        api_key = os.environ.get('LLM_API_KEY') or os.environ.get('OPENCODE_API_KEY')
         if not api_key:
-            print("Warning: OPENCODE_API_KEY not set, skipping LLM analysis")
+            print("Warning: LLM_API_KEY not set, skipping LLM analysis")
             return
 
         output = []

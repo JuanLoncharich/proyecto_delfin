@@ -141,7 +141,7 @@ El auto-responder consume las alertas de SLIPS en tiempo real, filtra solo las d
 
 **Efectividad.** Sin defensor, la base se exfiltra completa: 2.920 MB (2,8 GB). Con el defensor automático, la exfiltración se reduce en las 99 corridas, sin excepción. La media fue de 848,1 MB (−71,0 %) y la mediana de 758,2 MB (−74,0 %), con un mejor caso de 517,9 MB (−82,2 %) y un peor caso de 1.762,4 MB (−39,6 %). La amplitud de ese rango muestra que el resultado depende fuertemente del timing de la respuesta (Figura 1).
 
-![Distribución del volumen exfiltrado en las 99 ejecuciones](figures/exfil_size_distribution.png)
+![Distribución del volumen exfiltrado en las 99 ejecuciones](exfil_size_distribution.png)
 
 *Figura 1. Distribución del volumen exfiltrado (99 ejecuciones). Sin defensor se exfiltran 2,8 GB; con el defensor, la mediana cae a 758,2 MB (−74,0 %) y la media a 848,1 MB, en un rango de 517,9 MB (mejor caso) a 1.762,4 MB (peor caso).*
 
@@ -155,7 +155,7 @@ El auto-responder consume las alertas de SLIPS en tiempo real, filtra solo las d
 | Bloqueo de red | T4 (desde arranque de OpenCode) | 28,7 |
 | Inicio de ataque → bloqueo | `t_blocked` | ~61,8 |
 
-![Métricas de tiempo del pipeline en exfiltración](figures/opencode_response_timing.png)
+![Métricas de tiempo del pipeline en exfiltración](opencode_response_timing.png)
 
 *Figura 2. Métricas de tiempo del pipeline en exfiltración, a partir de los resúmenes de experimentos. De izquierda a derecha: Time to Alert, Time to Plan, Block Time, Time to Execute y OpenCode Start to Block. Se ve el contraste entre una detección rápida y una ejecución larga (Time to Execute), con el bloqueo efectivo ocurriendo temprano dentro de esa ejecución (OpenCode Start to Block).*
 
@@ -183,7 +183,7 @@ La terminación del proceso de volcado se dio en el 67,7 % de las ejecuciones, p
 
 **Efectividad.** El defensor evitó el descubrimiento de la contraseña en el **97 %** de las ejecuciones. Sobre 100 ejecuciones, el atacante encontró la contraseña en solo 3 (3,0 %), y en las tres alcanzó el límite máximo de 3.000 intentos antes de que el defensor completara la contención; en esos casos el defensor había ejecutado los comandos de bloqueo, pero sin tiempo suficiente para cortar la secuencia. El ataque mediano llegó a 1.026 intentos antes de la contención: un 34 % del diccionario de 3.000 palabras. La lectura es clara: en fuerza bruta, la detección temprana y la respuesta rápida son lo que decide si la credencial se compromete (Figura 3).
 
-![Distribución de intentos de login en las ejecuciones de fuerza bruta](figures/brute_force_attempts.png)
+![Distribución de intentos de login en las ejecuciones de fuerza bruta](brute_force_attempts.png)
 
 *Figura 3. Distribución de intentos de login (fuerza bruta). Mediana de 1.026 intentos antes de la contención y media de 1.051,4 (mínimo 242, máximo 3.000), es decir un 34 % del diccionario de 3.000. Los puntos cerca de 3.000 son las ejecuciones donde el atacante encontró la contraseña antes de que la contención se completara.*
 
@@ -198,7 +198,7 @@ La terminación del proceso de volcado se dio en el 67,7 % de las ejecuciones, p
 | OpenCode arranque → bloqueo | T6 | 25,0 |
 | Duración total (end-to-end) | T5 | 276,0 |
 
-![Métricas de tiempo del pipeline en fuerza bruta](figures/brute_force_timing.png)
+![Métricas de tiempo del pipeline en fuerza bruta](brute_force_timing.png)
 
 *Figura 4. Métricas de tiempo del pipeline en fuerza bruta. De izquierda a derecha: Time to Alert, Time to Plan, Time to Execute, Time to Block Port y Total Duration; las medianas figuran en el recuadro de la propia figura (9 outliers > 757 s no se muestran). A diferencia de la exfiltración, acá domina la detección (Time to Alert).*
 

@@ -1,278 +1,306 @@
 # Proyecto Final — Inteligencia Artificial
 
-**Autores:**  
-Juan Andrés Loncharich, Legajo 14534  
+**Autores:**
+Juan Andrés Loncharich, Legajo 14534
 Diego Alejandro Forni, Legajo 14329
 
-**Repositorio:** https://github.com/JuanLoncharich/proyecto_delfin  
-**Universidad Nacional de Cuyo — Ingeniería en Sistemas de Información**
+**Repositorio:** https://github.com/JuanLoncharich/proyecto_delfin
+**Universidad Nacional de Cuyo — Licenciatura en Ciencias de la Computación**
 
 ---
 
 ## 1. Introducción
 
-La proliferación de agentes de software autónomos impulsados por Modelos de Lenguaje de Gran Escala (LLMs, por sus siglas en inglés) está transformando rápidamente el panorama de la ciberseguridad. Los sistemas de detección de intrusiones (IDS) tradicionales son efectivos para identificar patrones de tráfico anómalos, pero sus pipelines de respuesta siguen siendo fundamentalmente dependientes de la intervención humana: se genera una alerta, un analista la evalúa y un operador aplica la contramedida. Esta cadena introduce latencias que pueden ser críticas: los ataques modernos de fuerza bruta y relleno de credenciales ejecutan cientos de intentos por segundo, y una ventana de respuesta de tan solo noventa segundos puede ser suficiente para que un atacante se autentique con éxito y establezca persistencia.
+Los agentes de software autónomos basados en LLMs están cambiando rápido el panorama de la ciberseguridad. Los sistemas de detección de intrusiones (IDS) tradicionales identifican bien los patrones de tráfico anómalos, pero su respuesta sigue dependiendo de un humano: se genera una alerta, un analista la evalúa, un operador aplica la contramedida. Esa cadena introduce latencia, y la latencia es exactamente lo que no se puede dar el lujo de tener un sistema bajo ataque: la fuerza bruta y el credential stuffing modernos ejecutan cientos de intentos por segundo, y una ventana de respuesta de apenas noventa segundos puede bastarle a un atacante para autenticarse y establecer persistencia.
 
-Al mismo tiempo, la disponibilidad de LLMs capaces de razonar sobre telemetría de red, generar comandos de shell ejecutables y adaptar su estrategia en tiempo real abre la posibilidad de una nueva clase de agente defensivo: uno que lee las alertas del IDS, formula un plan de remediación en lenguaje natural y ejecuta ese plan de forma autónoma en los hosts afectados, todo dentro de segundos desde la detección inicial. Esta no es una capacidad hipotética; las herramientas necesarias para construir tal sistema (plataformas IDS abiertas, APIs de LLM, agentes de codificación autónomos) están ampliamente disponibles hoy en día.
+Al mismo tiempo, ya existen LLMs capaces de razonar sobre telemetría de red, generar comandos de shell ejecutables y adaptar su estrategia en tiempo real. Eso habilita una nueva clase de agente defensivo: uno que lee las alertas del IDS, arma un plan de remediación en lenguaje natural y lo ejecuta de forma autónoma en los hosts afectados, todo en segundos desde la detección. No es una capacidad hipotética, las piezas para construir un sistema así (IDS, LLMs) ya están disponibles.
 
-El desafío, sin embargo, es empírico: no se sabe con certeza si los defensores basados en LLM realmente funcionan en condiciones adversariales, cómo fallan y si los comportamientos emergentes que producen son seguros y predecibles. Las evaluaciones existentes de agentes LLM en ciberseguridad son en su mayoría unilaterales: prueban capacidades ofensivas (generación de exploits, descubrimiento de vulnerabilidades, desobfuscación de código) de forma aislada, sin un defensor activo y adaptativo [1][2][3]. No existe ningún marco reproducible y abierto para ejecutar simultáneamente agentes LLM de ataque y defensa y observar su interacción.
+El problema es que no sabemos si esto funciona en la práctica. ¿Un defensor basado en LLM realmente contiene un ataque en condiciones adversariales? ¿Cómo falla? ¿Los comportamientos emergentes que produce son seguros y predecibles? Las evaluaciones existentes de agentes LLM en ciberseguridad son casi todas unilaterales: prueban capacidades ofensivas, generación de exploits, descubrimiento de vulnerabilidades, desofuscación de código, de forma aislada, sin un defensor activo del otro lado [1][2][3]. No hay ningún marco abierto y reproducible para correr simultáneamente agentes de ataque y de defensa y observar cómo interactúan.
 
-Este trabajo presenta **Trident**, un cyber range mínimo basado en Docker diseñado específicamente para cubrir esa brecha. Trident instancia dos subredes aisladas conectadas a través de una capa de enrutamiento, coloca un servidor protegido en un lado y un host comprometido en el otro, y ejecuta tres tipos de agentes simultáneos: un atacante (coder56, impulsado por un agente de codificación LLM), un defensor (SLIPS IDS más un auto-respondedor LLM) y un generador de tráfico benigno (db\_admin) que introduce ruido de fondo realista. Todo el tráfico entre subredes es capturado de forma determinista a través de un router central y alimentado al IDS casi en tiempo real, produciendo artefactos completamente reproducibles por corrida (archivos PCAP, líneas de tiempo JSONL estructuradas, logs de alertas del IDS) adecuados para análisis automatizado posterior.
+Este trabajo presenta **Trident**, un cyber range mínimo basado en Docker pensado específicamente para cubrir esa brecha. Trident levanta dos subredes aisladas conectadas por una capa de enrutamiento, un servidor protegido de un lado y un host comprometido del otro, y corre tres agentes simultáneos: un atacante (coder56, impulsado por un agente de codificación LLM), un defensor (SLIPS como IDS más un auto-responder LLM) y un generador de tráfico benigno (db_admin) que aporta ruido de fondo realista. Todo el tráfico entre subredes pasa por un router central que lo captura de forma determinista y se lo entrega al IDS casi en tiempo real, generando por cada corrida artefactos completamente reproducibles, PCAPs, líneas de tiempo JSONL, logs de alertas, listos para ser analizados automáticamente.
 
-El objetivo principal de la investigación es medir, en condiciones controladas y reproducibles, si un defensor basado en LLM puede detectar y mitigar ataques en tiempo real, qué modos de fallo exhibe y qué interacciones emergentes atacante-defensor surgen cuando ambos lados razonan de forma autónoma a partir de las mismas señales de red. Los objetivos secundarios incluyen caracterizar la estructura de costos de la defensa basada en LLM (en tokens y latencia) e identificar las vulnerabilidades sistémicas que surgen cuando un agente autónomo aplica reglas de firewall en su propio entorno de ejecución.
-
-Este documento se estructura de la siguiente manera. La Sección 2 cubre el marco teórico: LLMs, agentes de codificación autónomos y la plataforma SLIPS IDS. La Sección 3 describe el diseño experimental en detalle, incluyendo la infraestructura, las métricas y las tres categorías de experimentos realizados. La Sección 4 presenta y analiza los resultados de nueve corridas con agentes combinados. La Sección 5 presenta las conclusiones e identifica el trabajo futuro.
+El objetivo central es medir, en condiciones controladas y reproducibles, si un defensor LLM puede detectar y mitigar ataques en tiempo real, qué modos de fallo exhibe y qué interacciones emergentes surgen entre atacante y defensor cuando ambos razonan de forma autónoma sobre las mismas señales de red. Como objetivos secundarios, buscamos caracterizar el costo de la defensa basada en LLM (en tokens y latencia) e identificar las vulnerabilidades sistémicas que aparecen cuando un agente autónomo aplica reglas de firewall sobre su propio entorno de ejecución.
 
 ---
 
 ## 2. Marco Teórico
 
-### 2.1 Modelos de Lenguaje de Gran Escala y su Aplicación en Ciberseguridad
+### 2.1 LLMs y su aplicación en ciberseguridad
 
-Los Modelos de Lenguaje de Gran Escala son redes neuronales entrenadas en corpus de texto masivos mediante objetivos auto-supervisados (principalmente predicción del siguiente token) a una escala suficiente para producir capacidades de razonamiento emergentes [1]. El componente arquitectónico clave es el Transformer, introducido por Vaswani et al. en 2017, que utiliza atención multi-cabeza (multi-head self-attention) para modelar dependencias de largo alcance entre tokens sin recurrencia. Los modelos a la escala de decenas a cientos de miles de millones de parámetros exhiben aprendizaje en contexto (in-context learning): la capacidad de adaptar su comportamiento a una tarea descrita en lenguaje natural, sin ninguna actualización de pesos, únicamente a partir de los ejemplos e instrucciones proporcionados en el prompt.
+Los Modelos de Lenguaje Grandes son redes neuronales entrenadas en corpus de texto masivos mediante objetivos auto-supervisados, principalmente, predecir el siguiente token, a una escala que termina produciendo capacidades de razonamiento emergentes. La pieza arquitectónica central es el Transformer [6] (Vaswani et al., 2017), que usa multi-head self-attention para modelar dependencias de largo alcance entre tokens sin recurrencia. A partir de cierta escala de parámetros, estos modelos exhiben in-context learning: pueden adaptar su comportamiento a una tarea descrita en lenguaje natural sin actualizar un solo peso, solo a partir de los ejemplos e instrucciones que reciben en el prompt.
 
-La relevancia de los LLMs para la ciberseguridad fue reconocida tempranamente en la literatura y ha crecido sustancialmente desde la publicación de modelos altamente capaces. Una revisión sistemática de [1] identifica cuatro dominios de aplicación principales: (a) detección de vulnerabilidades y análisis de código, (b) síntesis de inteligencia de amenazas, (c) generación de malware y exploits, y (d) agentes autónomos de ataque y defensa. El relevamiento de 180 artículos encuentra que, si bien los LLMs son efectivos en las primeras tres tareas, los agentes de defensa autónomos permanecen en gran medida sin estudio y sin benchmarks adecuados. La mayoría de las evaluaciones existentes prueban agentes LLM ofensivos sin un defensor en vivo, o evalúan la capacidad defensiva en conjuntos de datos estáticos sin un atacante activo.
+La literatura reconoció temprano la relevancia de los LLMs para ciberseguridad, y el interés creció rápido con la llegada de modelos más capaces. Una revisión sistemática [1] identificó cuatro dominios de posible aplicación: (a) detección de vulnerabilidades y análisis de código, (b) síntesis de inteligencia de amenazas, (c) generación de malware y exploits, y (d) agentes autónomos de ataque y defensa. Sobre 180 artículos relevados, encuentra que los LLMs funcionan bien en las primeras tres tareas, pero que los agentes de defensa autónomos siguen prácticamente sin estudiar y sin benchmarks adecuados. La mayoría de las evaluaciones prueban agentes ofensivos sin un defensor en vivo, o miden capacidad defensiva sobre datasets estáticos sin un atacante activo del otro lado.
 
-Una encuesta de 2025 de [2] refuerza este hallazgo y agrega que el estado del arte en ciberseguridad basada en LLM está caracterizado por dos brechas persistentes: reproducibilidad y simultaneidad adversarial. Los estudios que prueban defensores LLM lo hacen contra ataques con guión (scripted) y basados en replay, en lugar de contra un agente adversarial en vivo que puede detectar y adaptarse a la defensa. Este trabajo aborda directamente ambas brechas a través del framework Trident.
+Una encuesta de 2025 [2] llega a la misma conclusión y la afina: el estado del arte en ciberseguridad basada en LLM tiene dos brechas persistentes, reproducibilidad y simultaneidad adversarial. Los defensores LLM se prueban contra ataques con guión o de replay, no contra un adversario en vivo capaz de detectar la defensa y adaptarse. Este trabajo apunta directamente a esas dos brechas.
 
-Desde una perspectiva de seguridad, [3] señala que los agentes de seguridad basados en LLM introducen vulnerabilidades únicas, incluyendo inyección de prompts (un atacante que inserta instrucciones maliciosas en payloads de red que el LLM defensor lee), desalineación de objetivos (el agente optimizando para un objetivo proxy en lugar de la seguridad real) y auto-interferencia catastrófica (el agente aplicando reglas que cortan su propio canal de control). Los tres modos de fallo fueron observados en los experimentos descritos aquí.
+Desde el ángulo de seguridad, [3] señala que los agentes de seguridad basados en LLM traen vulnerabilidades propias: prompt injection (un atacante mete instrucciones maliciosas en payloads de red que el LLM defensor termina leyendo), desalineación de objetivos (el agente optimiza un proxy en vez de la seguridad real) y auto-interferencia catastrófica (el agente aplica reglas que cortan su propio canal de control). Los tres modos de fallo aparecieron en nuestros experimentos.
 
-### 2.2 Agentes de Codificación Autónomos y OpenCode
+### 2.2 Agentes de codificación autónomos y OpenCode
 
-Un agente de codificación autónomo es un LLM al que se le otorga acceso a un conjunto de herramientas —como mínimo, una terminal— y se le asigna la tarea de lograr un objetivo expresado en lenguaje natural. El agente razona en un bucle: llama a una herramienta, observa la salida, actualiza su estado interno y decide la siguiente acción. Este bucle continúa hasta que el agente juzga el objetivo como completado o se alcanza un tiempo de espera. OpenCode [4] es una implementación de código abierto de este patrón diseñada específicamente para tareas de ingeniería de software y administración de sistemas. Expone una API HTTP que acepta un objetivo en lenguaje natural y devuelve un flujo de eventos JSON en streaming que contiene los pasos de razonamiento, llamadas a herramientas y salidas del agente.
+Un agente de codificación autónomo es un LLM al que se le da acceso a herramientas, como mínimo, una terminal y un objetivo en lenguaje natural. El agente razona en bucle: llama a una herramienta, observa el resultado, actualiza su estado interno, decide la siguiente acción, y repite hasta completar el objetivo o agotar el tiempo. OpenCode [4] implementa este patrón de forma abierta, pensado para tareas de ingeniería de software y administración de sistemas. Expone una API HTTP que recibe un objetivo y devuelve un stream de eventos JSON con los pasos de razonamiento, las llamadas a herramientas y las salidas del agente.
 
-En Trident, OpenCode se utiliza tanto para el atacante (coder56) como para el defensor (auto-respondedor): el atacante ejecuta OpenCode en el host comprometido y recibe un objetivo ofensivo, mientras que el auto-respondedor del defensor llama a OpenCode en el servidor objetivo con un plan de remediación generado por el planificador LLM.
+En Trident usamos OpenCode tanto para el atacante (coder56) como para el defensor: el atacante lo corre en el host comprometido con un objetivo ofensivo, y el auto-responder del defensor lo invoca en el servidor objetivo con un plan de remediación que arma el planificador LLM.
 
-Esta arquitectura separa dos responsabilidades: *planificación* (el planificador LLM lee la alerta del IDS y produce un plan de remediación estructurado y validado en JSON) y *ejecución* (OpenCode lee el plan y lo traduce en comandos de shell en el host afectado). El planificador está restringido a producir únicamente un plan en lenguaje natural con restricciones específicas de firewall; no ejecuta código directamente. Esta separación está diseñada para reducir el riesgo de que ataques de inyección de prompts lleguen a la capa de ejecución sin revisión, y para permitir que el plan sea validado contra un esquema JSON antes de su ejecución.
+Esta arquitectura separa dos responsabilidades, planificación y ejecución. El planificador lee la alerta del IDS y produce un plan de remediación estructurado y validado en JSON; OpenCode lo lee y lo traduce en comandos de shell sobre el host afectado. El planificador no ejecuta nada directamente, solo está autorizado a producir el plan bajo restricciones de firewall específicas. La separación busca reducir el riesgo de que un prompt injection llegue a la capa de ejecución sin pasar por una validación de esquema.
 
 ### 2.3 SLIPS: Stratosphere Linux IPS
 
-SLIPS (Stratosphere Linux IPS) [5] es un sistema de detección de intrusiones de red de código abierto desarrollado en el Laboratorio de Investigación Stratosphere de la Universidad Técnica Checa de Praga. Está diseñado para operar sobre tráfico en formato PCAP o directamente en interfaces de red, y utiliza una combinación de modelos de aprendizaje automático y detectores basados en reglas organizados en módulos de detección. Los módulos relevantes para este trabajo incluyen:
+SLIPS [5] es un IDS de red de código abierto desarrollado en el Stratosphere Research Laboratory de la Universidad Técnica Checa de Praga. Opera sobre tráfico en formato PCAP o directamente en interfaces de red, combinando modelos de aprendizaje automático con detectores basados en reglas organizados en módulos. Para este trabajo importan tres:
 
-- **PortScan**: detecta escaneos de puertos horizontales y verticales basándose en la cantidad de puertos de destino distintos o hosts contactados dentro de una ventana de tiempo.
-- **PasswordGuessing**: detecta intentos de fuerza bruta SSH y HTTP basándose en fallos de autenticación repetidos desde una única fuente.
-- Los módulos de **envenenamiento ARP**, **anomalías DNS** y **exfiltración de datos** también estuvieron activos pero no fueron el foco principal de los experimentos centrales.
+- **PortScan**: detecta escaneos horizontales y verticales según la cantidad de puertos o hosts de destino distintos contactados en una ventana de tiempo.
+- **PasswordGuessing**: detecta fuerza bruta SSH y HTTP por fallos de autenticación repetidos desde una misma fuente.
+- Los módulos de envenenamiento ARP, anomalías DNS y exfiltración también estuvieron activos, aunque no fueron el foco de los experimentos centrales.
 
-SLIPS genera alertas en formato JSON con un nivel de amenaza (info, low, medium, high, critical) y una descripción de la detección. Solo las alertas HIGH y CRITICAL son procesadas por el auto-respondedor para reducir las acciones defensivas impulsadas por falsos positivos. SLIPS se ejecuta dentro del contenedor `lab_slips_defender` y lee los archivos PCAP rotatorios generados por el router, introduciendo una latencia de hasta un intervalo de rotación de PCAP (30 segundos) entre la generación de tráfico y la emisión de alertas.
+SLIPS emite alertas en JSON con un nivel de amenaza (info, low, medium, high, critical) y una descripción de la detección. Solo procesamos las alertas HIGH y CRITICAL en el auto-responder, para no disparar acciones defensivas por falsos positivos. SLIPS corre dentro del contenedor `lab_slips_defender` y lee los PCAPs rotativos que produce el router, lo que introduce una latencia de hasta un intervalo de rotación (30 segundos) entre que ocurre el tráfico y se emite la alerta.
 
-### 2.4 Aprendizaje por Refuerzo a partir de Retroalimentación Humana y Seguimiento de Instrucciones
+### 2.4 RLHF y seguimiento de instrucciones
 
-Una propiedad clave que distingue a los LLMs que siguen instrucciones de los modelos base pre-entrenados es el entrenamiento de alineación, específicamente el Aprendizaje por Refuerzo a partir de Retroalimentación Humana (RLHF) y sus variantes (RLAIF, DPO). Estos procedimientos de entrenamiento enseñan al modelo a seguir instrucciones de forma confiable, rechazar solicitudes dañinas y producir salidas en formatos estructurados como JSON cuando se le solicita. Para la planificación de respuesta a incidentes, esta propiedad es esencial: el planificador no solo debe comprender la alerta de seguridad (una tarea de comprensión), sino también producir un objeto JSON con claves específicas en un formato determinado, bajo un system prompt que incluye restricciones estrictas de firewall. Sin el entrenamiento de alineación, los modelos base frecuentemente producen salidas con estructura inconsistente o ignoran restricciones explícitas en el prompt. El grado en que el entrenamiento de alineación se transfiere de forma confiable a tareas de salida estructurada novedosas, como la generación de planes JSON bajo condiciones adversariales, es en sí misma una pregunta empírica abierta, y es uno de los factores que explica los modos de fallo observados en la Sección 4.
+Lo que distingue a un LLM que sigue instrucciones de un modelo base es el entrenamiento de alineación, Aprendizaje por Refuerzo a partir de Retroalimentación Humana (RLHF) y sus variantes (RLAIF, DPO), que le enseña al modelo a seguir instrucciones de forma confiable, rechazar pedidos dañinos y producir salidas estructuradas como JSON cuando se le pide. Para la planificación de respuesta a incidentes esto es central: el planificador no solo tiene que entender la alerta de seguridad, sino producir un objeto JSON con claves específicas, bajo un system prompt con restricciones estrictas de firewall. Sin ese entrenamiento de alineación, los modelos base suelen producir salidas con estructura inconsistente o ignoran restricciones explícitas del prompt. Qué tan bien se transfiere esa alineación a una tarea de salida estructurada novedosa, generar planes JSON bajo condiciones adversariales, es en sí una pregunta abierta, y ayuda a explicar algunos de los modos de fallo que vemos en la Sección 4.
 
-### 2.5 Planificación de Respuesta a Incidentes con LLMs
+### 2.5 Planificación de respuesta a incidentes con LLMs
 
-El componente planificador recibe una alerta cruda de SLIPS y genera un plan de remediación estructurado utilizando un system prompt cuidadosamente diseñado (almacenado en `prompts.yaml`). El prompt instruye al modelo a:
+El planificador recibe una alerta cruda de SLIPS y genera un plan de remediación estructurado, guiado por un system prompt cuidadosamente diseñado (`prompts.yaml`) que le pide:
 
-1. Identificar el host ejecutor (la máquina donde debe ejecutarse la acción defensiva), la IP del atacante y el tipo de ataque.
-2. Producir un plan de contención inmediata, incluyendo reglas iptables específicas, cambios en la configuración SSH y, opcionalmente, estrategias de engaño.
-3. Incluir una sección `COMPLETION` con criterios verificables que el agente ejecutor pueda utilizar para confirmar que la remediación fue exitosa.
-4. Finalizar el plan con el token literal `END_OF_PLAN` para que el agente ejecutor sepa cuándo detenerse.
+1. Identificar el host ejecutor, la IP del atacante y el tipo de ataque.
+2. Armar un plan de contención inmediata: reglas iptables específicas, cambios en la configuración SSH y, opcionalmente, estrategias de engaño.
+3. Incluir una sección `COMPLETION` con criterios verificables que el agente ejecutor pueda usar para confirmar que la remediación funcionó.
+4. Cerrar el plan con el token literal `END_OF_PLAN`, para que el ejecutor sepa cuándo parar.
 
-De manera crítica, el prompt incluye restricciones estrictas sobre reglas de firewall: el planificador nunca debe sugerir bloquear SSH (puerto 22), HTTPS (puerto 443) o el puerto de control de OpenCode (4096), ya que hacerlo cortaría la propia capacidad de ejecución del agente. Las consecuencias de violar estas restricciones, observadas directamente en los experimentos, se discuten en la Sección 4.
+Un punto crítico del prompt: nunca debe sugerir bloquear SSH (puerto 22), HTTPS (443) ni el puerto de control de OpenCode (4096), porque eso cortaría la propia capacidad de ejecución del agente. Qué pasa cuando esta restricción se viola (nos pasó) se discute en la Sección 4.
 
 ---
 
 ## 3. Diseño Experimental
 
-### 3.1 Infraestructura: El Cyber Range Trident
+### 3.1 Infraestructura: el cyber range Trident
 
-Todos los experimentos fueron realizados en Trident, un cyber range basado en Docker Compose que crea un entorno de red completamente aislado y determinísticamente observable. La topología consiste en tres redes bridge de Docker:
+Todos los experimentos se corrieron en Trident, un cyber range basado en Docker que arma un entorno de red aislado y observable de forma determinista. La topología tiene tres redes bridge:
 
-- `lab_net_a` (172.30.0.0/24): la subred del atacante, que contiene a `lab_compromised` (172.30.0.10).
-- `lab_net_b` (172.31.0.0/24): la subred del defensor, que contiene a `lab_server` (172.31.0.10).
-- `lab_egress` (172.32.0.0/24): salida a internet solo para el router y el defensor; `lab_compromised` y `lab_server` no tienen acceso directo a internet.
+- `lab_net_a` (172.30.0.0/24): subred del atacante, con `lab_compromised` (172.30.0.10).
+- `lab_net_b` (172.31.0.0/24): subred del defensor, con `lab_server` (172.31.0.10).
+- `lab_egress` (172.32.0.0/24): salida a internet solo para el router y el defensor; `lab_compromised` y `lab_server` no tienen acceso directo.
 
-Todo el tráfico entre las dos subredes del laboratorio es forzado a través de `lab_router` mediante la sobreescritura de las rutas por defecto de ambos hosts al inicio del contenedor. El router ejecuta `tcpdump` en la interfaz LAN-A, produciendo archivos PCAP rotatorios cada 30 segundos en `outputs/<RUN_ID>/pcaps/`. Una captura continua simultánea se ejecuta en la interfaz de `lab_server`. Esta arquitectura garantiza que cada paquete que cruza entre subredes aparezca en el corpus de PCAP; no existe ninguna ruta que eluda el router.
+Todo el tráfico entre las dos subredes pasa obligatoriamente por `lab_router`, que sobreescribe las rutas por defecto de ambos hosts al iniciar el contenedor. El router corre `tcpdump` en la interfaz LAN-A y produce PCAPs rotativos cada 30 segundos en `outputs/<RUN_ID>/pcaps/`, con una captura simultánea en la interfaz de `lab_server`. Esto garantiza que cada paquete que cruza entre subredes quede registrado: no hay ninguna ruta que evite el router.
 
 | Contenedor | IP(s) | Rol |
 |---|---|---|
 | `lab_router` | 172.30.0.1, 172.31.0.1 | Enrutamiento entre subredes, captura PCAP, reenviador DNS |
-| `lab_server` | 172.31.0.10 | Objetivo protegido: PostgreSQL 15, OpenSSH, nginx, aplicación Flask de login |
+| `lab_server` | 172.31.0.10 | Servidor a proteger: PostgreSQL 15, OpenSSH, nginx, login Flask |
 | `lab_compromised` | 172.30.0.10 | Plataforma atacante: nmap, hydra, sshpass, OpenCode, rockyou.txt |
-| `lab_slips_defender` | 172.30.0.30, 172.31.0.30 | SLIPS IDS + auto-respondedor LLM |
+| `lab_slips_defender` | 172.30.0.30, 172.31.0.30 | SLIPS IDS + auto-responder LLM |
 | `lab_dashboard` | (dashboard_net) | Panel de monitoreo FastAPI + React |
 
-El servidor del laboratorio expone tres servicios: un proxy inverso nginx con una aplicación de login basada en Flask (puerto 80), SSH (puerto 22) y PostgreSQL (puerto 5432). La aplicación de login registra cada intento de autenticación (nombre de usuario, longitud de la contraseña, IP de origen, timestamp, éxito) en un archivo JSONL estructurado, lo que permite medir con precisión el progreso del ataque de forma independiente de las observaciones a nivel de red.
+El servidor expone tres servicios: un nginx con una app de login en Flask (puerto 80), SSH (22) y PostgreSQL (5432). La app de login registra cada intento de autenticación, usuario, longitud de contraseña, IP de origen, timestamp y éxito en un JSONL estructurado, lo que permite medir el avance del ataque con precisión, independientemente de lo que se vea a nivel de red.
 
-Para simular exfiltración de datos sin conectividad externa real, el router instala una regla DNAT que redirige el tráfico destinado a una IP pública falsa (137.184.126.86:443) hacia un listener de netcat local en el propio router, que escribe los bytes recibidos en un archivo de log. Esto permite al agente atacante "exfiltrar" volcados de bases de datos a una dirección aparentemente externa, manteniendo todos los datos dentro del laboratorio.
+Para simular exfiltración sin conectividad externa real, el router instala una regla DNAT que redirige el tráfico hacia una IP pública falsa (137.184.126.86:443) a un listener netcat local, que escribe los bytes recibidos en un log. Así el atacante puede "exfiltrar" volcados de base de datos hacia una dirección que parece externa, sin que ningún dato salga realmente del laboratorio.
 
 ### 3.2 Métricas
 
-Se definieron cinco métricas primarias para evaluar el rendimiento del defensor:
+Cinco métricas primarias evalúan el desempeño del defensor:
 
 | Métrica | Definición | Unidad |
 |---|---|---|
-| `t_alert` | Tiempo desde el primer paquete de ataque hasta la primera alerta HIGH/CRITICAL de SLIPS procesada por el auto-respondedor | segundos |
-| `t_decision` | Tiempo desde la primera alerta hasta que el planificador LLM retorna un plan de remediación validado | segundos |
-| `t_exec` | Tiempo desde la generación del plan hasta que OpenCode confirma la ejecución en el host objetivo | segundos |
-| `t_blocked` | Tiempo total transcurrido desde el inicio del ataque hasta que el servicio queda confirmado como bloqueado | segundos |
-| `password_found` | Si el atacante se autenticó exitosamente antes de ser bloqueado | booleano |
+| `t_alert` | Tiempo desde el primer paquete de ataque hasta la primera alerta HIGH/CRITICAL procesada | segundos |
+| `t_decision` | Tiempo desde la primera alerta hasta que el planificador devuelve un plan validado | segundos |
+| `t_exec` | Tiempo desde el plan hasta que OpenCode confirma la ejecución en el host objetivo | segundos |
+| `t_blocked` | Tiempo total desde el inicio del ataque hasta que el servicio queda bloqueado | segundos |
+| `password_found` | Si el atacante se autenticó antes de ser bloqueado | booleano |
 
-Se rastrearon dos métricas secundarias para el análisis de costos y eficiencia:
+Y dos métricas secundarias, para costo y eficiencia:
 
-- **Uso de tokens por agente por corrida**: tokens de entrada, tokens de salida, tokens de razonamiento y lecturas de caché, desagregados por atacante, defensor (lado servidor), defensor (lado comprometido) y agente benigno.
-- **Volumen de alertas**: número de alertas HIGH/CRITICAL procesadas por el auto-respondedor por corrida.
+- **Tokens por agente por corrida**: entrada, salida, razonamiento y lecturas de caché, desagregados por atacante, defensor (lado servidor), defensor (lado comprometido) y agente benigno.
+- **Volumen de alertas**: cantidad de alertas HIGH/CRITICAL que llegó a procesar el auto-responder por corrida.
 
-### 3.3 Categorías de Experimentos
+### 3.3 Escenarios de ataque
 
-Se diseñaron tres categorías de experimentos, cada una orientada a un escenario de ataque distinto:
+Para aislar el comportamiento del defensor, los dos escenarios usan un atacante **con script determinista**, no un agente LLM, de modo que la única fuente de variabilidad entre corridas sea la respuesta del defensor. Cada escenario se repitió decenas de veces sobre un estado de contenedor limpio.
 
-**Categoría A — Fuerza Bruta Web sobre Flask.** El atacante realiza un escaneo de descubrimiento de red y puertos con nmap, luego lanza un ataque de password spraying HTTP contra la página de login Flask utilizando una lista de 1.000 palabras con la contraseña correcta insertada en una posición aleatoria. Se espera que el defensor detecte el escaneo de puertos (alerta PortScan de SLIPS) y/o la fuerza bruta HTTP (alerta PasswordGuessing), genere un plan de bloqueo y lo ejecute antes de que el atacante encuentre la contraseña correcta. El experimento termina cuando el puerto Flask queda bloqueado (3 fallos de conexión consecutivos detectados por el script de monitoreo) o tras un tiempo de espera de 15 minutos.
+**Exfiltración de base de datos.** El escenario simula la explotación de CVE-2019-9193, una vulnerabilidad de PostgreSQL que permite ejecución remota de código, para volcar y exfiltrar la base. El objetivo es una instancia PostgreSQL 11 de 2,8 GB con registros de empleados. La exfiltración se ejecuta con `pg_dump -U postgres labdb | nc -w 600 137.184.126.86 443`, dirigiendo los datos al puerto 443 para que el tráfico se haga pasar por HTTPS. Esperamos que SLIPS detecte la gran transferencia saliente y que el defensor corte la conexión antes de que el volcado termine; medimos el éxito comparando los bytes que llegan al listener netcat del router contra el tamaño completo de la base. El script de ataque se corrió **99 veces**.
 
-**Categoría B — Exfiltración de Base de Datos.** El atacante se conecta a la instancia PostgreSQL en `lab_server`, vuelca la base de datos y transfiere el volcado a la IP externa simulada. Se espera que SLIPS detecte la gran transferencia de datos saliente y que el defensor bloquee la conexión antes de que el volcado se complete. El éxito se mide comparando los bytes recibidos en el listener netcat del router contra el tamaño completo de la base de datos.
+**Fuerza bruta sobre Flask.** El escenario prueba la respuesta del defensor a un ataque de fuerza bruta contra el login de una aplicación web Flask (`172.31.0.10:5000`). El ataque arranca con reconocimiento de red: descubrimiento y escaneo de puertos con nmap para ubicar el servicio Flask, y sigue con ~3.000 intentos de contraseña vía curl contra el endpoint de login. La contraseña correcta está colocada al final de la wordlist, para garantizar que el ataque siga corriendo el tiempo suficiente como para que el defensor responda. Un script de monitoreo sigue la disponibilidad del puerto Flask y detecta cuándo queda bloqueado, señal de que el defensor intervino con reglas de firewall. El script se corrió **100 veces**.
 
-**Categoría C — Agentes Combinados.** El escenario más complejo: el atacante, el defensor y el agente benigno se ejecutan simultáneamente. El atacante recibe un objetivo abierto ("encontrar y comprometer el servidor en la red"), el defensor responde a las alertas de SLIPS en tiempo real y el agente benigno genera tráfico legítimo de PostgreSQL y web en paralelo. Este escenario prueba la precisión del defensor (¿bloquea solo al atacante y no al agente benigno?) y revela interacciones emergentes atacante-defensor que no aparecen en experimentos aislados.
+### 3.4 Herramientas y configuración
 
-### 3.4 Herramientas y Configuración
+El sistema de respuesta automática se organiza en tres capas que operan en conjunto: detección (SLIPS), planificación (LLM) y ejecución (OpenCode). Cada capa usa un modelo distinto, asignado según la tarea:
 
 | Herramienta / Framework | Versión | Propósito |
 |---|---|---|
 | Docker Engine | 27.0 | Ciclo de vida de contenedores |
 | Docker Compose | v2 | Orquestación multi-contenedor |
-| SLIPS | 1.0.14 (parcheado) | IDS de red, generación de alertas |
+| SLIPS | 1.0.14 | IDS de red, generación de alertas |
 | Zeek | 6.x (vía SLIPS) | Parseo de protocolos para análisis PCAP |
-| OpenCode | 0.3.x | Runtime del agente de codificación LLM |
-| LLM API | gpt-oss-120b vía e-INFRA CZ | Proveedor LLM para todos los agentes |
-| nmap 7.94 | — | Descubrimiento de puertos y hosts (atacante) |
-| hydra 9.4 | — | Fuerza bruta SSH/HTTP (atacante) |
-| FastAPI | 0.110 | API REST del defensor, backend del dashboard |
-| React 18 + Tailwind | — | Frontend del panel de monitoreo |
-| Python 3.12 | — | Scripts de experimentos y análisis |
-| matplotlib + seaborn | — | Visualización de resultados |
+| OpenCode | 0.3.x | Runtime del agente de codificación (ejecutor) |
+| LLM planificador | gpt-oss-120b | Convierte las alertas del IDS en planes de remediación JSON |
+| LLM ejecutor | Qwen3-Coder | Ejecuta los planes sobre el host objetivo |
 
-SLIPS fue parcheado en tres lugares para funcionar correctamente en el entorno del laboratorio: el perfil local de Zeek fue ajustado para usar el nombre correcto de la interfaz del laboratorio, el módulo analizador HTTP fue modificado para evitar alertas falsas de PasswordGuessing en los health checks de la aplicación Flask del laboratorio, y el umbral del módulo flowalerts para detección de fuerza bruta SSH fue ajustado del valor por defecto (20 fallos) a 5 fallos para reducir la latencia de detección en experimentos con conteo de intentos limitado.
+El auto-responder consume las alertas de SLIPS en tiempo real, filtra solo las de nivel HIGH con confianza ≥ 0,8 y deduplica en memoria por IP de origen, IP de destino, tipo de ataque, protocolo y timestamp, para no procesar dos veces la misma firma de ataque. Cuando una alerta pasa el filtro, invoca al planificador, este recibe un JSON con la IP ejecutora y el plan de remediación creado, luego abre una conexión SSH al host objetivo como root y lanza OpenCode con el plan creado y algunos detalles específicos de la alerta. Cada ejecución queda registrada en JSON estructurado: pasos de razonamiento del LLM, uso de herramientas (exitoso y fallido), salida final, errores y tiempos.
 
-### 3.5 Resultados de los Experimentos con Agentes Combinados
+### 3.5 Resultados
 
-Se realizaron nueve corridas con agentes combinados durante dos fechas (19–20 de marzo de 2026). Cada corrida fue inicializada desde un estado de contenedor limpio con un nuevo `RUN_ID`. El objetivo del atacante en todas las corridas fue encontrar y comprometer el servidor; el defensor respondió de forma autónoma a las alertas de SLIPS; el agente benigno (cuando estaba presente) ejecutó una carga de trabajo de administración de PostgreSQL con intervalos de espera de 60 a 130 segundos entre tareas.
+#### 3.5.1 Exfiltración de base de datos (99 corridas)
 
-**Tabla 1: Resumen de Corridas con Agentes Combinados**
+**Efectividad.** Sin defensor, la base se exfiltra completa: 2.920 MB (2,8 GB). Con el defensor automático, la exfiltración se reduce en las 99 corridas, sin excepción. La media fue de 848,1 MB (−71,0 %) y la mediana de 758,2 MB (−74,0 %), con un mejor caso de 517,9 MB (−82,2 %) y un peor caso de 1.762,4 MB (−39,6 %). La amplitud de ese rango muestra que el resultado depende fuertemente del timing de la respuesta (Figura 1).
 
-| Corrida | Fecha/Hora | Benigno | Estado Defensor | Tokens Atacante | Resultado Notable |
-|---------|-----------|---------|-----------------|-----------------|-------------------|
-| 1 | 20260319_211825 | No | Ambos activos | 3,9M | El atacante sondea el puerto de control de OpenCode (4096); detecta rate-limiting y pivotea |
-| 2 | 20260319_215344 | Sí | Ambos activos | 0,65M | Amplificación de tokens 10×; cero falsos positivos sobre tráfico benigno |
-| 3 | 20260319_222827 | Sí | Solo servidor | 8,4M | Lado comprometido del defensor silencioso; el atacante opera sin oposición la mayor parte de la corrida |
-| 4 | 20260319_231420 | Sí | Ambos activos | 1,9M | Los tres agentes coexisten; fuerza bruta HTTP detectada en lote |
-| 5 | 20260319_234448 | No | Ambos activos | 0,16M | El atacante termina temprano; interacción mínima |
-| 6 | 20260320_000226 | No | Solo servidor | 12,2M | El defensor aplica regla OUTPUT de auto-bloqueo; el atacante sobrevive al defensor |
-| 7 | 20260320_004808 | No | Cero respuestas | 8,2M | Interrupción total del defensor en volumen pico de alertas (116 alertas; 0 respuestas) |
-| 8 | 20260320_013351 | No | Ambos activos | 1,2M | El defensor inventa de forma independiente honeypot y archivos de credenciales falsos |
-| 9 | 20260320_021543 | No | Ambos activos | — | El defensor despliega honeypot multi-puerto; el atacante cae en la trampa y es rastreado |
+![Distribución del volumen exfiltrado en las 99 ejecuciones](figures/exfil_size_distribution.png)
 
-**Tabla 2: Estadísticas de Uso de Tokens del Atacante**
+*Figura 1. Distribución del volumen exfiltrado (99 ejecuciones). Sin defensor se exfiltran 2,8 GB; con el defensor, la mediana cae a 758,2 MB (−74,0 %) y la media a 848,1 MB, en un rango de 517,9 MB (mejor caso) a 1.762,4 MB (peor caso).*
 
-| Estadística | Valor |
-|---|---|
-| Mediana de tokens del atacante (todas las corridas) | ~2,0M |
-| Mínimo | 0,16M (corrida 5, terminación temprana) |
-| Máximo | 12,2M (corrida 6, bucle de enumeración exhaustiva) |
-| Corridas con defensor completamente activo (ambas instancias) | 6 / 9 |
-| Corridas con cero falsos positivos sobre tráfico benigno | 3 / 3 (todas las corridas con agente benigno) |
-| Corridas con interrupción o auto-bloqueo del defensor | 3 / 9 (corridas 6, 7 y parcialmente 3) |
+**Tiempos de respuesta.** El pipeline detecta rápido pero ejecuta lento. La detección (`t_alert`) tuvo una mediana de 24,6 s y la generación del plan llegó a una mediana acumulada de 33,1 s. El cuello de botella es la ejecución de OpenCode, con una mediana acumulada de 158,5 s, es decir, unos 125,4 s de latencia de ejecución pura. Ahora bien, el bloqueo de red efectivo ocurre temprano dentro de esa ejecución: la mediana del bloqueo desde el arranque de OpenCode es de 28,7 s, de modo que el servicio queda cortado a una mediana de ~61,8 s del inicio del ataque (plan + bloqueo), mientras que OpenCode sigue trabajando hasta los ~158 s en verificación y limpieza (Figura 2).
 
-**Tabla 3: Modos de Fallo del Defensor Observados**
-
-| Modo de Fallo | Observado En | Causa |
+| Fase | Métrica | Mediana (s) |
 |---|---|---|
-| Fallo de inicio del agente benigno | 6 / 9 corridas | Condición de carrera: el atacante reclama la sesión OpenCode primero |
-| Cascada de rate limiting de API | Corridas 1, 6 | Límite de 4 solicitudes paralelas compartido entre todos los agentes |
-| Auto-bloqueo del defensor (regla OUTPUT) | Corrida 6 | El planificador LLM violó la restricción de firewall del system prompt |
-| Interrupción total del defensor | Corrida 7 | API de OpenCode no disponible; el auto-respondedor falló silenciosamente |
-| Bucle de contradicción en prompt/plan | Corridas 1, 3 | El atacante ataca el puerto 4096; el defensor no puede bloquearlo |
+| Detección SLIPS | `t_alert` (T1) | 24,6 |
+| Generación de plan | T2 (acumulado) | 33,1 |
+| Ejecución OpenCode | `t_exec` (T3, acumulado) | 158,5 |
+| Bloqueo de red | T4 (desde arranque de OpenCode) | 28,7 |
+| Inicio de ataque → bloqueo | `t_blocked` | ~61,8 |
+
+![Métricas de tiempo del pipeline en exfiltración](figures/opencode_response_timing.png)
+
+*Figura 2. Métricas de tiempo del pipeline en exfiltración, a partir de los resúmenes de experimentos. De izquierda a derecha: Time to Alert, Time to Plan, Block Time, Time to Execute y OpenCode Start to Block. Se ve el contraste entre una detección rápida y una ejecución larga (Time to Execute), con el bloqueo efectivo ocurriendo temprano dentro de esa ejecución (OpenCode Start to Block).*
+
+**Frecuencia de acciones.** El bloqueo de tráfico saliente domina la estrategia (91,9 % de las ejecuciones): es el mecanismo principal de contención, ya que interrumpe directamente el canal de exfiltración. Antes de actuar, el defensor tiende a reconocer el estado del sistema (revisar conexiones de red y listar procesos, 82,8 % cada uno), lo que sugiere que prefiere entender antes de modificar.
+
+> **Tabla: Frecuencia de acciones defensivas en las 99 ejecuciones (exfiltración).**
+
+| Acción | Frecuencia | Porcentaje |
+|---|---|---|
+| Bloquear tráfico saliente | 91/99 | 91,9 % |
+| Revisar conexiones de red | 82/99 | 82,8 % |
+| Listar procesos | 82/99 | 82,8 % |
+| Modificar reglas de firewall | 76/99 | 76,8 % |
+| Terminar proceso | 67/99 | 67,7 % |
+| Bloquear tráfico entrante | 56/99 | 56,6 % |
+| Detener servicio | 47/99 | 47,5 % |
+| Listar archivos | 39/99 | 39,4 % |
+| Borrar archivo | 33/99 | 33,3 % |
+| Gestión de servicios | 31/99 | 31,3 % |
+| Otras acciones | 35/99 | 35,4 % |
+
+La terminación del proceso de volcado se dio en el 67,7 % de las ejecuciones, pero no en todas: algunas respuestas se apoyaron solo en reglas de firewall sin matar el `pg_dump`. La interrupción de servicios (SSH, PostgreSQL o nginx) apareció en el 47,5 %, una contención agresiva. El bloqueo de tráfico entrante desde el atacante (56,6 %) es una medida proactiva que impide nuevas conexiones aunque falle el bloqueo de salida. Más allá de estas categorías, aparecieron 21 tipos de acción distintos a lo largo de las ejecuciones.
+
+#### 3.5.2 Fuerza bruta sobre Flask (100 ejecuciones)
+
+**Efectividad.** El defensor evitó el descubrimiento de la contraseña en el **97 %** de las ejecuciones. Sobre 100 ejecuciones, el atacante encontró la contraseña en solo 3 (3,0 %), y en las tres alcanzó el límite máximo de 3.000 intentos antes de que el defensor completara la contención; en esos casos el defensor había ejecutado los comandos de bloqueo, pero sin tiempo suficiente para cortar la secuencia. El ataque mediano llegó a 1.026 intentos antes de la contención: un 34 % del diccionario de 3.000 palabras. La lectura es clara: en fuerza bruta, la detección temprana y la respuesta rápida son lo que decide si la credencial se compromete (Figura 3).
+
+![Distribución de intentos de login en las ejecuciones de fuerza bruta](figures/brute_force_attempts.png)
+
+*Figura 3. Distribución de intentos de login (fuerza bruta). Mediana de 1.026 intentos antes de la contención y media de 1.051,4 (mínimo 242, máximo 3.000), es decir un 34 % del diccionario de 3.000. Los puntos cerca de 3.000 son las ejecuciones donde el atacante encontró la contraseña antes de que la contención se completara.*
+
+**Tiempos de respuesta.** Acá el perfil se invierte respecto de la exfiltración: el peso está en la detección, no en la ejecución. SLIPS necesita una mediana de 163,5 s para alcanzar confianza alta sobre el patrón de fuerza bruta (es la fase de acumulación de evidencia), el planificador agrega 10,5 s (174,0 s acumulados) y el auto-responder casi no suma overhead. La ejecución de OpenCode, una vez lanzada, es corta: 25,0 s de mediana del arranque al bloqueo, y buena parte de ese tiempo se dedica a tareas forenses y de preparación defensiva (preservar logs, backups de configuración, recolectar estado del sistema, documentar la línea de tiempo) más que a la contención inmediata. La mediana end-to-end es de 276,0 s, dominada por la detección y por el trabajo forense posterior antes que por la respuesta activa (Figura 4).
+
+| Fase | Métrica | Mediana (s) |
+|---|---|---|
+| Detección SLIPS | T1 | 163,5 |
+| Generación de plan | T2 (acumulado) | 174,0 |
+| Ejecución OpenCode (acumulado) | T3 | 174,0 |
+| Puerto bloqueado | T4 | 199,0 |
+| OpenCode arranque → bloqueo | T6 | 25,0 |
+| Duración total (end-to-end) | T5 | 276,0 |
+
+![Métricas de tiempo del pipeline en fuerza bruta](figures/brute_force_timing.png)
+
+*Figura 4. Métricas de tiempo del pipeline en fuerza bruta. De izquierda a derecha: Time to Alert, Time to Plan, Time to Execute, Time to Block Port y Total Duration; las medianas figuran en el recuadro de la propia figura (9 outliers > 757 s no se muestran). A diferencia de la exfiltración, acá domina la detección (Time to Alert).*
+
+**Frecuencia de acciones.** El bloqueo de tráfico vía reglas de firewall vuelve a dominar (91,0 %), y el reconocimiento previo es casi universal: revisar conexiones de red, listar procesos y leer archivos aparecen los tres en el 91,0 % de las ejecuciones.
+
+> **Tabla: Frecuencia de acciones defensivas en las 100 ejecuciones (fuerza bruta).**
+
+| Acción | Frecuencia | Porcentaje |
+|---|---|---|
+| Revisar conexiones de red | 91/100 | 91,0 % |
+| Modificar reglas de firewall | 91/100 | 91,0 % |
+| Listar procesos | 91/100 | 91,0 % |
+| Leer archivo | 91/100 | 91,0 % |
+| Otras acciones | 91/100 | 91,0 % |
+| Listar archivos | 89/100 | 89,0 % |
+| Terminar proceso | 82/100 | 82,0 % |
+| Buscar/verificar | 67/100 | 67,0 % |
+| Revisar tareas programadas | 58/100 | 58,0 % |
+| Gestión de servicios | 58/100 | 58,0 % |
+| Buscar IOCs en logs | 56/100 | 56,0 % |
+| Revisar cuentas de usuario | 54/100 | 54,0 % |
+| Revisar estado de servicios | 37/100 | 37,0 % |
+| Preservar logs | 31/100 | 31,0 % |
+| Buscar en archivos temporales | 29/100 | 29,0 % |
+| Revisar logs del sistema | 26/100 | 26,0 % |
+| Backup de configuración | 25/100 | 25,0 % |
+| Borrar archivo | 25/100 | 25,0 % |
+| Captura de red | 22/100 | 22,0 % |
+| Buscar en logs | 5/100 | 5,0 % |
+| Detener servicio | 5/100 | 5,0 % |
 
 ---
 
 ## 4. Análisis y Discusión de Resultados
 
-### 4.1 Efectividad General del Defensor
+### 4.1 Efectividad general del defensor
 
-El defensor estuvo parcial o completamente activo en 8 de las 9 corridas con agentes combinados. En las tres corridas donde también operó el agente benigno, SLIPS generó **cero alertas de falsos positivos** atribuyendo tráfico benigno al atacante. Este es un resultado positivo significativo: SLIPS mantuvo precisión bajo condiciones de tráfico mixto, atribuyendo correctamente todas las alertas a la subred del atacante (172.30.0.10) a pesar de las simultáneas conexiones legítimas a PostgreSQL y solicitudes web salientes del agente benigno. Esto demuestra que la detección conductual de SLIPS es suficientemente específica para distinguir un patrón de fuerza bruta de cargas de trabajo reales de bases de datos, incluso cuando ambas se originan en la misma subred del host comprometido.
+El defensor redujo el volumen exfiltrado de forma consistente (71–74 %) y evitó el compromiso de credenciales en el 97 % de las ejecuciones de fuerza bruta. La arquitectura de tres capas —detección, planificación, ejecución— efectivamente interviene en ataques en curso. Pero hay un límite estructural que ningún ajuste de prompt borra: incluso en el mejor caso de exfiltración se filtraron más de 500 MB antes de que el bloqueo hiciera efecto. Detectar y ejecutar lleva tiempo, y mientras tanto el ataque avanza.
 
-Sin embargo, la tasa de respuesta efectiva del defensor estuvo sustancialmente por debajo del 100%. En tres de nueve corridas (33%), el defensor produjo cero respuestas (corrida 7) o aplicó una regla de firewall contraproducente que lo desconectó durante la ejecución (corrida 6). Estos no son casos extremos menores: la corrida 7 ocurrió con el mayor volumen de alertas del conjunto de datos (116 alertas), precisamente la condición bajo la cual el defensor más necesitaba funcionar. Esto implica que la robustez del sistema bajo carga es un problema abierto primordial.
+Los dos escenarios exhiben perfiles de latencia opuestos, y eso es informativo. En exfiltración el cuello de botella es la **ejecución** (mediana de ejecución acumulada de 158,5 s, con ~125 s de latencia de ejecución pura), mientras la detección es casi instantánea (24,6 s). En fuerza bruta es al revés: la **detección** domina (163,5 s, porque SLIPS necesita acumular evidencia de fallos repetidos), y la ejecución es rápida (25 s). Optimizar el pipeline, entonces, no tiene una sola palanca: según el tipo de ataque, conviene atacar la latencia de ejecución o la de detección.
 
-### 4.2 El Efecto de Amplificación de Tokens
+### 4.2 Acciones notables
 
-Uno de los hallazgos más significativos es lo que denominamos el **efecto de amplificación de tokens**: un ataque de bajo costo genera una respuesta defensiva desproporcionadamente costosa. En la corrida 2, el atacante utilizó 650K tokens, uno de sus conteos más bajos, indicando un esfuerzo de enumeración relativamente limitado. Sin embargo, el servidor defensor consumió 7,8M de tokens en la misma corrida, más de 12× el costo del atacante. La causa es estructural: un escaneo de puertos horizontal (en el que el atacante contacta progresivamente más IPs distintas) genera una alerta PortScan de SLIPS cada vez que se cruza un nuevo umbral (5 → 20 → 35 → 51 → 67 IPs de destino). Cada alerta desencadena un ciclo completo de planificador + ejecutor LLM. El atacante paga por un escaneo; el defensor paga por cada umbral que cruza.
+El análisis de ejecuciones individuales reveló varias categorías de respuesta inesperadas o particularmente creativas, que se apartan de los playbooks estándar de respuesta a incidentes.
 
-Esta asimetría tiene implicaciones prácticas para cualquier despliegue de defensa basada en LLM a escala. Si el defensor opera bajo la misma estructura de costos que el atacante (un presupuesto de API compartido), un atacante sostenido y de bajo esfuerzo puede agotar los recursos del defensor antes de causar ningún daño real. La limitación de las llamadas LLM defensivas (tal vez mediante la deduplicación de alertas dentro de una ventana corta, ya parcialmente implementada a través de `DUPLICATE_DETECTION_WINDOW=300`) es necesaria pero no suficiente; el problema central es que SLIPS genera múltiples alertas para un único evento de ataque lógico.
+**Interrupción de servicios.** Muchas respuestas detuvieron servicios críticos como mecanismo de contención, con el costo de impactar operaciones legítimas. Varias ejecuciones apagaron el servicio SSH —dejando afuera a administradores legítimos—, otras detuvieron la base durante el incidente, y una llegó a parar nginx pese a no tener relación con la exfiltración de PostgreSQL. El defensor prioriza la contención sobre la disponibilidad, lo que puede ser razonable en algunos escenarios y problemático en otros.
 
-### 4.3 Comportamientos Emergentes: Honeypots y Engaño
+**Engaño.** Algunas de las respuestas más creativas pasaron por subvertir las herramientas del atacante en vez de simplemente bloquearlas. Varias ejecuciones intentaron reemplazar el binario `pg_dump`; otras desplegaron una instancia PostgreSQL señuelo con un `pg_dump` falso que devuelve tablas fabricadas, una estrategia de desinformación-como-defensa que le entrega datos basura al atacante. Además, en la mayoría de las ejecuciones se crearon honeypots, no solo para Flask y PostgreSQL sino para los servicios más comunes. Son estrategias potentes, aunque con riesgo: la base señuelo puede caerse o comportarse de forma inconsistente.
 
-El hallazgo más llamativo de los experimentos combinados es el despliegue espontáneo de infraestructura de engaño por parte del defensor, que no estaba especificado explícitamente en el system prompt. El system prompt instruye al planificador a "no limitarse a planes de remediación normales, incluir engaño y contraataques", pero la implementación específica fue completamente emergente de la interpretación del LLM de esa directiva.
+**Forense y recolección de evidencia.** Varias respuestas mostraron orientación forense. Una ejecución respaldó todo el directorio de logs del sistema con copia timestamped; otra copió `/etc/passwd` y `/etc/shadow` a `/root`; otras crearon snapshots de solo lectura de los logs, y muchas copiaron PCAPs para preservar la captura de tráfico. El defensor parece reconocer el valor de la evidencia incluso durante la respuesta activa, aunque no en todos los escenarios sea apropiado.
 
-En la corrida 8, el defensor creó de forma independiente lo que describió como un "Honeyport (8888) — Desperdicia tiempo del atacante con respuestas lentas", junto con archivos de credenciales falsos con registro de accesos y entradas DNS falsas apuntando a hosts inexistentes. En la corrida 9, esta estrategia evolucionó: el defensor desplegó un sistema multicapa que incluía cinco servicios falsos en los puertos 80, 443, 3000, 5000, 4443, 8080, 8888 y 9999, cada uno con un propósito distinto (servidor beacon para simulación de C2, endpoint de exfiltración falso, servidor de bandera falsa devolviendo datos "comprometidos" ficticios). La intención explícita declarada del defensor fue:
+**Caza y eliminación de payloads.** Varias respuestas fueron más allá del bloqueo de red para buscar y remover artefactos maliciosos. Varias ejecuciones apuntaron a borrar archivos `.so` sospechosos en `/tmp`; una inspeccionó los descriptores de archivo con `lsof` antes de borrar el payload oculto. Es threat hunting proactivo que va de la contención a la erradicación.
 
-> *"En lugar de simplemente bloquear, hemos creado activamente servicios falsos que: registran cada intento de conexión, devuelven indicadores falsos de 'éxito', permiten a los atacantes creer que están teniendo éxito mientras son rastreados."*
+**Caza de persistencia.** La mayoría de las respuestas investigaron mecanismos de persistencia: listar los directorios de cron y abrir archivos de tareas programadas para detectar jobs sospechosos. Aunque no detienen la exfiltración directamente, reflejan una mentalidad de respuesta más completa, atenta a vectores futuros.
 
-El atacante cayó en esto en la corrida 9. Tras encontrar las respuestas engañosas del honeypot, el atacante atribuyó el comportamiento a una falla de infraestructura en lugar de un engaño activo:
+**Tooling de seguridad proactivo.** Varias respuestas desplegaron herramientas de seguridad adicionales durante el incidente: instalar y arrancar fail2ban (sumando IDS/IPS host-based al vuelo), o intentar desplegar escáneres de rootkits como chkrootkit o rkhunter, que en algunos casos detectaron los propios scripts de monitoreo como maliciosos.
 
-> *"El servidor parece no responder. Déjame revisar los otros hosts más cuidadosamente."*
+**Acciones contraproducentes.** En el otro extremo, algunas respuestas destruyeron evidencia útil. Varias ejecuciones borraron logs temporales generados durante la propia ejecución del defensor; en algunas se borraron datos legítimos de PostgreSQL; y en el caso más extremo, justificándose en el "engaño", el defensor creó logs de autenticación falsos junto con archivos de malware y backdoor ficticios.
 
-El atacante nunca detectó el honeypot. Interpretó las respuestas engañosas como problemas de red y desplazó su búsqueda hacia otros objetivos potenciales, pasando un tiempo considerable interactuando con los endpoints del honeypot y generando telemetría que el defensor recopilaba silenciosamente. Este es un engaño cognitivamente realista: tanto humanos como LLMs tienden a aplicar la navaja de Occam y atribuir el comportamiento inesperado a causas mundanas (errores de red, sobrecarga) antes de considerar el engaño activo. El fracaso del atacante LLM al no modelar a un adversario fue explotado por el defensor LLM.
+### 4.3 Adaptabilidad vs. predecibilidad
 
-### 4.4 La Paradoja del Puerto de Control
+La enorme variedad de acciones es a la vez la fortaleza y la debilidad del planificador LLM. Del lado positivo, descubre estrategias que no están en ningún playbook: bases señuelo con datos falsos, caza de persistencia (systemd, cron), eliminación de payloads. Del lado negativo, esa misma adaptabilidad lo vuelve impredecible: ejecuciones distintas resuelven escenarios parecidos de maneras distintas, y un operador no puede anticipar qué hará el defensor en una situación dada, lo que complica la aprobación operativa, el troubleshooting y el análisis forense.
 
-En la corrida 1, SLIPS generó una alerta `PasswordGuessing` por solicitudes HTTP repetidas del atacante hacia `172.31.0.1:4096/session/[SESSION_ID]/abort`. El puerto 4096 es la API de OpenCode, el canal de control a través del cual el defensor recibe y ejecuta sus planes. El atacante descubrió este puerto durante la enumeración de servicios y comenzó a sondearlo.
+La inconsistencia también se manifiesta como **sobre-agresión**: muchas respuestas detuvieron SSH, PostgreSQL o nginx, bloquearon todo el tráfico HTTPS saliente (no solo la IP maliciosa) o borraron logs y evidencia, acciones que afectan operaciones legítimas mucho más allá de lo necesario para contener el ataque. El origen es identificable: el system prompt instruye a "detener inmediatamente el ataque y prevenir consecuencias futuras" sin acotar de forma explícita el daño colateral admisible en cada caso. Futuras iteraciones tienen que balancear velocidad de contención con seguridad operativa.
 
-El system prompt prohíbe explícitamente bloquear el puerto 4096, porque hacerlo terminaría con la propia capacidad de ejecución del defensor. Esto creó una paradoja de seguridad genuina: el atacante encontró el único punto de fallo del defensor, y el defensor literalmente no puede cerrarlo. Todos los planes generados para esta alerta omitieron el paso de bloquear el puerto 4096, dejando al atacante libre para sondear el canal de control durante toda la corrida. El atacante no aprovechó esto (no intentaba abortar la sesión del defensor, solo realizaba enumeración de servicios), pero la vulnerabilidad estructural es real y reproducible.
+### 4.4 Limitaciones del diseño experimental
 
-Este hallazgo revela una limitación arquitectónica fundamental del sistema tal como fue diseñado: un agente autónomo que aplica reglas de firewall en su propio entorno de ejecución no puede proteger su propio canal de control. Cualquier escaneo de puertos suficientemente exhaustivo descubrirá el puerto de control, y la restricción que impide su cierre es innegociable para la operación continua del sistema.
+**El bloqueo no es instantáneo.** Aun en el mejor caso de exfiltración se filtraron 500+ MB. La ventana entre el primer paquete y el bloqueo efectivo es inherente a un pipeline detección→plan→ejecución, y marca un piso de daño que la arquitectura actual no puede evitar.
 
-### 4.5 Adaptación del Atacante a Acciones Defensivas
+**Atacante con script determinista.** Para aislar el comportamiento del defensor, el atacante de estos dos escenarios no es un agente LLM: no modela al defensor, no detecta los bloqueos ni los evade. Por eso estos resultados acotan la respuesta del defensor frente a un ataque fijo, no frente a un adversario adaptativo.
 
-En la corrida 1, después de que el defensor aplicó reglas de limitación de tasa, el atacante nunca recibió un mensaje explícito de "bloqueado", solo timeouts y fallos de conexión. La respuesta del atacante fue un razonamiento dirigido por objetivos sobre un adversario inferido:
+**Latencia de rotación de PCAP.** El intervalo de 30 s impone un piso estructural en `t_alert` que no refleja ninguna limitación del LLM, sino un parámetro del laboratorio. Con análisis en streaming, esa latencia sería menor.
 
-> *"El servidor podría haber bloqueado mi IP o está sobrecargado. Déjame intentar un enfoque diferente."*
+**Entorno controlado.** La red es chica (dos hosts, dos subredes) y totalmente gestionada por Docker. Las redes reales tienen órdenes de magnitud más hosts y tráfico, así que los comportamientos observados son hipótesis sobre el mundo real, no hallazgos validados en producción.
 
-El atacante entonces cambió de endpoints HTTP a HTTPS, buscó archivos de configuración expuestos que pudieran revelar credenciales y pivoteó hacia el escaneo de subredes adicionales. Esta adaptación ocurrió dentro de un único bucle de razonamiento, sin ninguna guía humana. El atacante infirió la existencia de una defensa a partir del patrón de fallos y actualizó su modelo de ataque en consecuencia. Esto es más sofisticado que la lógica de reintento simple y representa un nivel de adaptabilidad adversarial cualitativamente diferente al de las herramientas de ataque con guión.
+**Wordlist determinista.** La fuerza bruta usó una lista de ~3.000 palabras con la contraseña al final, lo que garantiza que el experimento termine de forma predecible pero subestima la complejidad de un password spraying real (listas más grandes, estrategia adaptada a las políticas de bloqueo, credenciales de brechas previas).
 
-### 4.6 Fracaso del Atacante en Escalar más allá del Reconocimiento
-
-Un patrón consistente en las nueve corridas es que el agente atacante (coder56) nunca logró autenticarse en ningún servicio. A pesar de descubrir la página de login Flask, los intentos de fuerza bruta del atacante se limitaron a solicitudes HTTP POST secuenciales usando una lista de palabras genérica vía curl, sin intentar credenciales por defecto obvias (admin/admin, root/root, labuser/labpass) ni cambiar a una herramienta dedicada de fuerza bruta como hydra. Cuando HTTP falló, el atacante buscó filtraciones de credenciales en archivos expuestos y pivoteó hacia el escaneo de otros hosts, pero nunca escaló de forma sistemática.
-
-Este límite conductual es probablemente un artefacto de la distribución de entrenamiento del LLM. El modelo genera secuencias de siguiente acción plausibles para patrones de ataque comunes, pero la planificación de ataque sistemática y multi-etapa que requiere razonar a través de múltiples modos de fallo ("fuerza bruta HTTP falló → intentar SSH → intentar credenciales por defecto → intentar credential stuffing con nombres de usuario recopilados") requiere una forma de persistencia de objetivos y gestión de estado estructurada que el system prompt actual de coder56 no impone. Esto es abordable mediante ingeniería de prompts y fue identificado como una corrección prioritaria para futuras iteraciones de experimentos.
-
-### 4.7 Limitaciones del Diseño Experimental
-
-Varias limitaciones deben reconocerse al interpretar estos resultados:
-
-**Latencia de rotación de PCAP.** El intervalo de rotación de PCAP de 30 segundos introduce un retraso estructural de hasta 30 segundos entre la generación de tráfico y la emisión de alertas de SLIPS. Esto significa que `t_alert` tiene un piso de ~30 segundos, que no refleja una limitación inherente del LLM sino un parámetro arquitectónico del laboratorio. En un despliegue productivo con análisis en streaming, esta latencia sería mucho menor.
-
-**Limitación de tasa de API con clave compartida.** Tres agentes LLM simultáneos que comparten una única clave de API con un límite de 4 solicitudes paralelas crearon contención artificial que causó fallos en múltiples corridas. Esta es una restricción de infraestructura, no una limitación fundamental de la defensa basada en LLM. Separar las credenciales de API por tipo de agente eliminaría este modo de fallo.
-
-**Proveedor LLM único.** Todos los agentes utilizaron el mismo modelo (gpt-oss-120b vía e-INFRA CZ). Los resultados son por lo tanto específicos a las capacidades y limitaciones de esta familia de modelos. Un modelo de clase GPT-4 podría producir una generación de reglas de firewall más confiable (reduciendo los eventos de auto-bloqueo), pero también podría ser más costoso por token. La elección del modelo debería evaluarse como variable en trabajos futuros.
-
-**Entorno de laboratorio controlado.** La red del laboratorio es pequeña (dos hosts, dos subredes) y completamente gestionada por Docker. Las redes empresariales reales tienen órdenes de magnitud más hosts, servicios y patrones de tráfico. Los resultados conductuales de este laboratorio (despliegue de honeypots, paradoja del puerto de control, amplificación de tokens) son hipótesis sobre el comportamiento en el mundo real, no hallazgos demostrados en producción.
-
-**Ausencia de movimiento lateral.** El atacante estuvo restringido a un único host comprometido y nunca se movió lateralmente a otros sistemas. Los actores de amenazas persistentes avanzadas (APT) reales comúnmente utilizan el punto de apoyo inicial comprometido para pivotar a subredes adyacentes, escalar privilegios y establecer mecanismos de persistencia que sobreviven a los reinicios. La arquitectura Trident soporta agregar hosts internos adicionales para simular esto, pero los experimentos de movimiento lateral estuvieron fuera del alcance de este proyecto.
-
-**Lista de palabras determinista.** Los experimentos de fuerza bruta utilizaron una lista de 1.000 palabras con la contraseña correcta en una posición aleatoria. Esta es una simplificación artificial: los ataques reales de password spraying utilizan listas mucho más grandes, adaptan su estrategia basándose en las políticas de bloqueo observadas y pueden usar bases de datos de credenciales de brechas previas. La lista controlada del laboratorio garantiza que el experimento termine de forma predecible, pero subestima la complejidad de los escenarios de fuerza bruta reales.
+**Un modelo por rol.** El planificador fue gpt-oss-120b y el ejecutor Qwen3-Coder; los resultados son específicos de esas familias. Un modelo de mayor capacidad podría generar reglas de firewall más confiables y menos sobre-agresión, posiblemente a mayor costo por token. Conviene evaluar el modelo como variable en trabajo futuro.
 
 ---
 
 ## 5. Conclusiones Finales
 
-Este trabajo demuestra que un defensor autónomo basado en LLM, integrado con un IDS de vanguardia (SLIPS) y un agente de codificación autónomo (OpenCode), es técnicamente viable y produce efectos defensivos medibles en un entorno de laboratorio controlado. A lo largo de nueve corridas con agentes combinados, se pueden extraer las siguientes conclusiones:
+Este trabajo muestra que un defensor autónomo basado en LLM, integrado con un IDS de referencia (SLIPS) y un agente de codificación autónomo (OpenCode), es técnicamente viable y produce efectos defensivos medibles en un laboratorio controlado.
 
-**Lo que funcionó.** El pipeline SLIPS + planificador LLM + ejecución OpenCode detectó exitosamente los ataques, generó planes de remediación y aplicó reglas de firewall en el host objetivo en la mayoría de las corridas. El defensor inventó espontáneamente estrategias de engaño (honeypots, archivos de credenciales falsos) que engañaron exitosamente al atacante sin ninguna instrucción explícita para usar estas técnicas específicas: una capacidad emergente que superó la especificación de diseño explícita. SLIPS mantuvo cero falsos positivos en las tres corridas donde un agente benigno estuvo activo, demostrando precisión de detección aceptable bajo condiciones de tráfico mixto.
+**Lo que funcionó.** El pipeline detección→planificación→ejecución redujo el volumen exfiltrado de forma consistente (71–74 %) y evitó el descubrimiento de credenciales en el 97 % de las ejecuciones de fuerza bruta. Y lo hizo descubriendo, por su cuenta, estrategias que exceden el playbook clásico: bases de datos señuelo con datos falsos, honeypots, caza de persistencia y de payloads, despliegue de tooling de seguridad al vuelo.
 
-**Lo que falló.** El sistema falló en aproximadamente un tercio de las corridas debido a problemas de infraestructura e ingeniería de prompts: interrupción del defensor bajo carga máxima de alertas (corrida 7), bloqueo de firewall auto-infligido (corrida 6) y condiciones de carrera en el inicio del agente benigno (6/9 corridas). Estos no son limitaciones fundamentales del LLM sino problemas de ingeniería con soluciones conocidas e implementables: lógica de reintentos en la creación de sesiones, deduplicación de alertas de SLIPS antes de que lleguen al planificador y una excepción explícita en el system prompt para el caso donde el atacante ataca el puerto de control.
+**Lo que falló o preocupa.** La misma adaptabilidad que produce esas estrategias creativas vuelve al defensor impredecible y, a menudo, sobre-agresivo: corta servicios legítimos (SSH, PostgreSQL, nginx), bloquea tráfico de más, borra logs e incluso datos legítimos. Y por más rápido que detecte, siempre se filtran cientos de MB antes de que el bloqueo haga efecto.
 
-**Hallazgo estructural: el efecto de amplificación de tokens.** La asimetría de costos entre atacar y defender —donde un ataque de bajo esfuerzo genera una respuesta defensiva de alto costo— es una propiedad estructural del sistema que tiene implicaciones significativas para la escalabilidad. Un adversario consciente de esto puede agotar los presupuestos de API defensivos sin montar un ataque serio. La planificación presupuestada por alerta con un circuit-breaker que recurra a respuestas basadas en reglas es un complemento necesario a la defensa basada en LLM.
+**Hallazgo central.** La adaptabilidad del LLM es a la vez su mayor fortaleza y su mayor riesgo. La sobre-agresión no es un capricho del modelo: nace directamente de un system prompt que ordena "detener inmediatamente" sin restringir el daño colateral. El camino hacia adelante no es un prompt "mejor" en abstracto, sino uno que acote explícitamente qué puede y qué no puede tocar el defensor, complementado con un diseño de pipeline que ataque el cuello de botella correcto según el tipo de ataque (ejecución en exfiltración, detección en fuerza bruta).
 
-**Trabajo futuro.** Varios experimentos fueron diseñados pero no completados dentro del alcance de este proyecto:
+**Trabajo futuro.** Varias líneas quedan abiertas:
 
-- *Inyección adversarial de prompts*: insertar instrucciones maliciosas en payloads de red (cabeceras HTTP, registros DNS TXT) que el LLM defensor lea como parte del contexto de la alerta. Se diseñó un experimento preliminar de inyección de entropía DNS (`scripts/defender_experiments/injection/`) pero no fue completamente evaluado.
-- *Ataques adaptativos multi-ronda*: un atacante que modele explícitamente el comportamiento del defensor a partir de eventos de bloqueo observados y adapte su estrategia para evitar activar la detección de SLIPS. El atacante actual muestra adaptación limitada; una especificación de objetivo más sofisticada impulsaría esto más lejos.
-- *Comparación de modelos*: evaluar la misma arquitectura con diferentes modelos LLM (GPT-4o, Claude 3.5 Sonnet, Llama 3.1 70B) para caracterizar la relación entre capacidad del modelo, calidad de la defensa y costo.
-- *Medición formal de latencias*: las tres métricas de latencia (`t_alert`, `t_decision`, `t_exec`) fueron calculadas para los experimentos de fuerza bruta, pero sus distribuciones a lo largo de N ≥ 30 corridas permitirían una caracterización estadística de la capacidad de respuesta del pipeline.
+- *Restricciones de daño colateral*: acotar en el system prompt los servicios, puertos y archivos que el defensor no debe tocar, y medir cómo cambia la sobre-agresión.
+- *Atacante adaptativo*: reemplazar el script determinista por un agente LLM que modele al defensor a partir de los bloqueos observados y adapte su estrategia para evadir la detección de SLIPS.
+- *Inyección adversarial de prompts*: insertar instrucciones maliciosas en payloads de red (cabeceras HTTP, registros DNS TXT) que el LLM defensor lea como parte del contexto de la alerta.
+- *Comparación de modelos*: correr la misma arquitectura con distintos LLMs (GPT-4o, Claude 3.5 Sonnet, Llama 3.1 70B) para caracterizar la relación entre capacidad del modelo, calidad de la defensa, sobre-agresión y costo.
+- *Caracterización estadística de latencias*: las distribuciones de `t_alert`, `t_decision` y `t_exec` sobre N ≥ 30 ejecuciones ya están al alcance con los datos actuales y permiten describir formalmente la capacidad de respuesta del pipeline.
 
-Una nota metodológica importante: el análisis de experimentos y la identificación de interacciones notables descritas en la Sección 4 se realizaron utilizando tanto la inspección manual de las líneas de tiempo JSONL estructuradas como un script de análisis asistido por LLM (`generate_brute_force_analysis.py`) que enviaba trazas de ejecución a un LLM y le pedía que identificara la acción más inesperada en cada corrida. Este meta-uso de un LLM para analizar el comportamiento de otros LLMs produjo resúmenes consistentes y útiles, pero también destaca el desafío de la evaluación en este dominio: el evaluador y el sistema bajo evaluación comparten las mismas capacidades y potenciales puntos ciegos. El trabajo futuro debería incluir la revisión por expertos humanos de una muestra aleatoria de corridas para validar los resúmenes generados por el LLM.
+Una nota metodológica: la identificación de las interacciones notables de la Sección 4 combinó inspección manual de las líneas de tiempo JSONL con un script de análisis asistido por LLM, que enviaba trazas de ejecución a un LLM y le pedía señalar la acción más inesperada de cada corrida. Este meta-uso de un LLM para analizar el comportamiento de otros LLMs dio resúmenes consistentes y útiles, pero también expone el problema central de evaluar en este dominio: el evaluador y el sistema evaluado comparten las mismas capacidades, y potencialmente los mismos puntos ciegos. Conviene sumar revisión humana experta sobre una muestra aleatoria de ejecuciones para validar esos resúmenes.
 
-La contribución central de este trabajo es Trident en sí mismo: un cyber range reproducible y de código abierto que hace posible ejecutar estos experimentos sin dependencias de hipervisores, con captura de tráfico determinista y artefactos estructurados por corrida. El código está disponible en el repositorio indicado y está diseñado para ser extendido con nuevos escenarios de ataque, nuevos tipos de agentes y proveedores LLM alternativos.
-
-Más allá de Trident como infraestructura, este trabajo aporta tres hallazgos empíricos a la pregunta más amplia de la defensa autónoma basada en LLM: (1) los comportamientos de engaño emergentes —honeypots, credenciales falsas, respuestas de servicio engañosas— pueden surgir de una única directiva en el system prompt y pueden ser efectivos contra un atacante LLM que no modela el engaño activo; (2) el efecto de amplificación de tokens es un problema de costo estructural que requiere soluciones arquitectónicas (deduplicación de alertas, presupuestación por alerta, fallback con circuit-breaker) en lugar de simplemente mejores prompts; y (3) la paradoja del puerto de control —un agente que aplica reglas de firewall en su propio entorno de ejecución no puede proteger su propio canal de control— es una restricción arquitectónica fundamental que requiere un canal separado y reforzado para operaciones defensivas en cualquier despliegue productivo. Estos hallazgos son directamente relevantes para la agenda de investigación más amplia de agentes autónomos basados en LLM seguros y confiables [7][8].
+La contribución central de este trabajo es Trident en sí mismo: un cyber range reproducible y abierto que permite correr este tipo de experimentos sin depender de hipervisores, con captura de tráfico determinista y artefactos estructurados por corrida. El código está disponible en el repositorio indicado, pensado para extenderse con nuevos escenarios de ataque, nuevos tipos de agentes y proveedores LLM alternativos.
 
 ---
 
@@ -332,8 +360,8 @@ Más allá de Trident como infraestructura, este trabajo aporta tres hallazgos e
 │  Planificador LLM (prompts.yaml + gpt-oss-120b)       │
 │       │                                               │
 │       ▼ plan JSON                                     │
-│  Auto-Respondedor ──SSH──▶ lab_server / lab_compr.   │
-│       │                    (OpenCode ejecuta el plan) │
+│  Auto-responder ──SSH──▶ lab_server / lab_compr.     │
+│       │                  (OpenCode + Qwen3-Coder)     │
 │       ▼                                               │
 │  outputs/RUN_ID/slips/defender_alerts.ndjson          │
 └──────────────────────────────────────────────────────┘
@@ -344,15 +372,14 @@ Más allá de Trident como infraestructura, este trabajo aporta tres hallazgos e
 ```
 1. make up           → genera RUN_ID, crea árbol de outputs, levanta router+server+compromised
 2. make defend       → levanta lab_slips_defender, provisiona llaves SSH
-3. make benign       → inicia db_admin (agente de tráfico benigno)
-4. make coder56 "…"  → inicia agente atacante con objetivo en lenguaje natural
+3. ejecutar el script de ataque (exfiltración o fuerza bruta), repetido N veces
 
 Flujo interno (defensor):
-  router PCAP (30s) → SLIPS analiza → alerta HIGH/CRITICAL
-  → forward_alerts.py → POST /plan (planificador LLM)
-  → plan JSON → auto_responder.py → SSH → OpenCode en lab_server/lab_compromised
+  router PCAP (30s) → SLIPS analiza → alerta HIGH (confianza ≥ 0,8)
+  → auto_responder.py (filtra + deduplica) → POST /plan (planificador LLM)
+  → plan JSON → SSH → OpenCode (Qwen3-Coder) en lab_server/lab_compromised
   → comandos ejecutados → exit_code + stdout/stderr registrados
   → línea de tiempo JSONL actualizada
 
-5. make down         → detiene todo, elimina volúmenes (preserva outputs/)
+4. make down         → detiene todo, elimina volúmenes (preserva outputs/)
 ```
